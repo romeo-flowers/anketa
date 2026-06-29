@@ -686,7 +686,7 @@
   function getPhone() {
     var hiddenVal = document.getElementById('phone').value.trim();
     // Если Apps Script подставил значение — используем его
-    if (hiddenVal && hiddenval.indexOf('<' + '?') === -1) return hiddenVal;
+    if (hiddenVal && hiddenVal.indexOf('<' + '?') === -1) return hiddenVal;
     // Иначе берём из URL (preview)
     return getUrlParam('phone');
   }
