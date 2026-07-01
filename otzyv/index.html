@@ -46,6 +46,9 @@
   .submit-btn:hover{ background:#273617; }
   .ghost-btn{ background:none; border:1px dashed #ccc7bf; color:#8ca28c; margin-top:10px; }
   .ghost-btn:hover{ background:#f8f6f2; color:#273617; border-color:#8ca28c; }
+  .rerate{ display:none; font-size:11px; color:#8ca28c; cursor:pointer; margin:0 0 4px; text-align:left; }
+  .rerate:hover{ color:#273617; text-decoration:underline; }
+  .err{ display:none; background:#fdf0ef; border:1px solid #e8b4b0; border-radius:3px; padding:9px 12px; font-size:12px; color:#a05050; margin-top:10px; text-align:left; line-height:1.5; }
   /* ── Footer ── */
   .footer{ background:#f5f2ed; border-top:1px solid #e8e2da; padding:12px; text-align:center;
         font-size:8.5px; letter-spacing:3px; text-transform:uppercase; color:#b0aa9e; }
@@ -64,6 +67,7 @@
       <div class="header-desc" id="hdesc">Оцените, пожалуйста — это займёт 10 секунд 🙏</div>
     </div>
     <div class="body">
+      <a id="reRate" class="rerate">← оценить заново</a>
       <div id="rate" class="screen active">
         <div class="stars" id="stars">
           <span class="star" data-v="1">★</span><span class="star" data-v="2">★</span>
@@ -79,6 +83,7 @@
         <p class="b-text">Расскажите, что пошло не так — мы разберёмся и всё исправим.</p>
         <textarea id="negComment" placeholder="Что не понравилось / что улучшить?"></textarea>
         <input id="negPhone" type="tel" inputmode="tel" placeholder="+7 (___) ___-__-__">
+        <div id="negErr" class="err">Оставьте телефон или пару слов — чтобы мы могли связаться и всё исправить.</div>
         <button class="submit-btn" id="sendNeg">Отправить</button>
       </div>
 
@@ -115,8 +120,24 @@
   var SUBMIT_URL = 'https://script.google.com/macros/s/AKfycbx0FYyE3hckyyyhzZPbf4X2gELlhLoGNj8YbRfJcjj1bTbKlKjo-n16cMUWN7SBnxDepw/exec';
   var GIS_URL = 'https://2gis.kz/kostanay/geo/70000001089278071';
 
-  function getPhone(){ try{ return new URLSearchParams(location.search).get('phone')||''; }catch(e){ return ''; } }
-  function show(id){ document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); }); document.getElementById(id).classList.add('active'); }
+  function getParam(k){ try{ return new URLSearchParams(location.search).get(k)||''; }catch(e){ return ''; } }
+  function getPhone(){ return getParam('phone'); }
+  var CNAME = getParam('name').trim();
+  var CORDER = (getParam('order') || getParam('date') || '').trim();
+  function defGreeting(){ return CNAME ? CNAME + ', как вам заказ?' : 'Как вам ваш заказ?'; }
+  function show(id){
+    document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+    document.getElementById(id).classList.add('active');
+    var canRerate = (id==='neg'||id==='ok4'||id==='ok5');
+    document.getElementById('reRate').style.display = canRerate ? 'block' : 'none';
+  }
+  function goRate(){
+    rating = 0; sent = false;
+    document.querySelectorAll('.star').forEach(function(s){ s.classList.remove('on'); });
+    document.getElementById('negErr').style.display = 'none';
+    setHeader(defGreeting(), 'Оцените, пожалуйста — это займёт 10 секунд 🙏');
+    show('rate');
+  }
   function post(d){
     var body = JSON.stringify(d);
     try { if (navigator.sendBeacon && navigator.sendBeacon(SUBMIT_URL, new Blob([body],{type:'text/plain;charset=utf-8'}))) return; } catch(e){}
@@ -131,7 +152,12 @@
     var s = String(v).replace(/\D/g,'');
     if (s[0]==='8') s = '7'+s.slice(1);
     if (s && s[0]!=='7') s = '7'+s;
-    return s.slice(1,11);                 // до 10 цифр после кода страны 7
+    return s.slice(1,11);                 // до 10 цифр после кода страны 7 (в живом поле всегда есть префикс +7)
+  }
+  function toLocal10(v){                    // нормализация номера из ссылки в 10 локальных цифр
+    var s = String(v).replace(/\D/g,'');
+    if (s.length === 11 && (s[0]==='7' || s[0]==='8')) s = s.slice(1); // код страны 7/8 + 10 локальных
+    return s.slice(-10);
   }
   function fmtTail(p){
     var out = '+7 ';
@@ -153,8 +179,11 @@
   np.addEventListener('input', applyMask);
   np.addEventListener('focus', function(){ if (np.value.replace(/\D/g,'').length <= 1) { np.value = '+7 '; var L=np.value.length; try{ np.setSelectionRange(L,L); }catch(err){} } });
   var pre = getPhone();
-  if (pre) { prevDigits = tailDigits(pre); np.value = fmtTail(prevDigits); }
+  if (pre) { prevDigits = toLocal10(pre); np.value = fmtTail(prevDigits); }
   else { np.value = '+7 '; }
+
+  document.getElementById('reRate').addEventListener('click', goRate);
+  document.getElementById('greeting').textContent = defGreeting();
 
   var rating = 0, sent = false;
   document.getElementById('stars').addEventListener('click', function(e){
@@ -170,17 +199,22 @@
   });
 
   document.getElementById('sendNeg').addEventListener('click', function(){
-    if(sent) return; sent = true;
+    if(sent) return;
     var raw = np.value.replace(/\D/g,'');
-    post({ type:'nps', rating:rating, phone:(raw.length>=10 ? raw : getPhone()), comment:document.getElementById('negComment').value.trim() });
+    var hasPhone = raw.length >= 11;
+    var cm = document.getElementById('negComment').value.trim();
+    if(!hasPhone && !cm){ document.getElementById('negErr').style.display='block'; return; }
+    document.getElementById('negErr').style.display='none';
+    sent = true;
+    post({ type:'nps', rating:rating, phone:(hasPhone?raw:getPhone()), comment:cm, name:CNAME, order:CORDER });
     setHeader('Приняли 💌', ''); show('doneNeg');
   });
   document.getElementById('send4').addEventListener('click', function(){
     if(sent) return; sent = true;
-    post({ type:'nps', rating:4, phone:getPhone(), comment:document.getElementById('c4').value.trim() });
+    post({ type:'nps', rating:4, phone:getPhone(), comment:document.getElementById('c4').value.trim(), name:CNAME, order:CORDER });
     show('donePos');
   });
-  function post5(){ if(sent) return; sent = true; post({ type:'nps', rating:5, phone:getPhone(), comment:document.getElementById('c5').value.trim() }); }
+  function post5(){ if(sent) return; sent = true; post({ type:'nps', rating:5, phone:getPhone(), comment:document.getElementById('c5').value.trim(), name:CNAME, order:CORDER }); }
   document.getElementById('gisBtn').addEventListener('click', post5);
   document.getElementById('send5').addEventListener('click', function(){ post5(); show('donePos'); });
 </script>
