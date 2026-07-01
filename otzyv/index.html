@@ -120,23 +120,37 @@
   function post(d){ try{ fetch(SUBMIT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(d)}); }catch(e){} }
   function setHeader(g, d){ document.getElementById('greeting').textContent = g; document.getElementById('hdesc').textContent = d || ''; }
 
-  // маска телефона: +7 (XXX) XXX-XX-XX
-  function fmtPhone(v){
+  // маска телефона: "+7 " — фиксированный префикс, редактируется только хвост
+  var np = document.getElementById('negPhone');
+  var prevDigits = '';
+  function tailDigits(v){
     var s = String(v).replace(/\D/g,'');
     if (s[0]==='8') s = '7'+s.slice(1);
     if (s && s[0]!=='7') s = '7'+s;
-    var p = s.slice(1,11);
-    var out = '+7';
-    if (p.length>0) out += ' (' + p.substring(0,3);
-    if (p.length>=3) out += ')';
-    if (p.length>3) out += ' ' + p.substring(3,6);
+    return s.slice(1,11);                 // до 10 цифр после кода страны 7
+  }
+  function fmtTail(p){
+    var out = '+7 ';
+    if (p.length>0) out += '(' + p.substring(0,3);
+    if (p.length>=3) out += ') ';
+    if (p.length>3) out += p.substring(3,6);
     if (p.length>6) out += '-' + p.substring(6,8);
     if (p.length>8) out += '-' + p.substring(8,10);
     return out;
   }
-  var np = document.getElementById('negPhone');
-  np.addEventListener('input', function(){ this.value = fmtPhone(this.value); });
-  var pre = getPhone(); if (pre) np.value = fmtPhone(pre);
+  function applyMask(e){
+    var d = tailDigits(np.value);
+    var del = e && e.inputType && e.inputType.indexOf('delete') === 0;
+    if (del && d === prevDigits && d.length > 0) d = d.slice(0, -1); // стёрли разделитель → снимаем цифру
+    prevDigits = d;
+    np.value = fmtTail(d);
+    var L = np.value.length; try { np.setSelectionRange(L, L); } catch(err){}
+  }
+  np.addEventListener('input', applyMask);
+  np.addEventListener('focus', function(){ if (np.value.replace(/\D/g,'').length <= 1) { np.value = '+7 '; var L=np.value.length; try{ np.setSelectionRange(L,L); }catch(err){} } });
+  var pre = getPhone();
+  if (pre) { prevDigits = tailDigits(pre); np.value = fmtTail(prevDigits); }
+  else { np.value = '+7 '; }
 
   var rating = 0, sent = false;
   document.getElementById('stars').addEventListener('click', function(e){
@@ -153,7 +167,8 @@
 
   document.getElementById('sendNeg').addEventListener('click', function(){
     if(sent) return; sent = true;
-    post({ type:'nps', rating:rating, phone:(np.value.replace(/\D/g,'')||getPhone()), comment:document.getElementById('negComment').value.trim() });
+    var raw = np.value.replace(/\D/g,'');
+    post({ type:'nps', rating:rating, phone:(raw.length>=10 ? raw : getPhone()), comment:document.getElementById('negComment').value.trim() });
     setHeader('Приняли 💌', ''); show('doneNeg');
   });
   document.getElementById('send4').addEventListener('click', function(){
