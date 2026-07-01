@@ -94,7 +94,7 @@
         <div class="b-emoji">🌟</div>
         <div class="b-title">Спасибо, это лучшая награда!</div>
         <p class="b-text">Будем очень благодарны за отзыв в 2ГИС — это займёт минуту.</p>
-        <a class="submit-btn" id="gisBtn" href="#" target="_blank" rel="noopener">Оставить отзыв в 2ГИС</a>
+        <a class="submit-btn" id="gisBtn" href="#" rel="noopener">Оставить отзыв в 2ГИС</a>
         <textarea id="c5" placeholder="Есть идея, как стать лучше? (необязательно)"></textarea>
         <button class="submit-btn ghost-btn" id="send5">Отправить пожелание</button>
       </div>
@@ -117,7 +117,11 @@
 
   function getPhone(){ try{ return new URLSearchParams(location.search).get('phone')||''; }catch(e){ return ''; } }
   function show(id){ document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); }); document.getElementById(id).classList.add('active'); }
-  function post(d){ try{ fetch(SUBMIT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(d)}); }catch(e){} }
+  function post(d){
+    var body = JSON.stringify(d);
+    try { if (navigator.sendBeacon && navigator.sendBeacon(SUBMIT_URL, new Blob([body],{type:'text/plain;charset=utf-8'}))) return; } catch(e){}
+    try { fetch(SUBMIT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:body,keepalive:true}); } catch(e){}
+  }
   function setHeader(g, d){ document.getElementById('greeting').textContent = g; document.getElementById('hdesc').textContent = d || ''; }
 
   // маска телефона: "+7 " — фиксированный префикс, редактируется только хвост
