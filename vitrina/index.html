@@ -336,24 +336,6 @@ footer{
       <input type="text" id="faddress" class="full" placeholder="Адрес доставки" style="display:none">
       <select id="ftime" class="full">
         <option value="">К какому времени нужен букет</option>
-        <option value="Как можно скорее">Как можно скорее</option>
-        <option value="Сегодня, 9:00–11:00">Сегодня, 9:00–11:00</option>
-        <option value="Сегодня, 11:00–13:00">Сегодня, 11:00–13:00</option>
-        <option value="Сегодня, 13:00–15:00">Сегодня, 13:00–15:00</option>
-        <option value="Сегодня, 15:00–17:00">Сегодня, 15:00–17:00</option>
-        <option value="Сегодня, 17:00–19:00">Сегодня, 17:00–19:00</option>
-        <option value="Сегодня, 19:00–21:00">Сегодня, 19:00–21:00</option>
-        <option value="Сегодня, 21:00–23:00">Сегодня, 21:00–23:00</option>
-        <option value="Сегодня, 23:00–01:00">Сегодня, 23:00–01:00</option>
-        <option value="Завтра, 9:00–11:00">Завтра, 9:00–11:00</option>
-        <option value="Завтра, 11:00–13:00">Завтра, 11:00–13:00</option>
-        <option value="Завтра, 13:00–15:00">Завтра, 13:00–15:00</option>
-        <option value="Завтра, 15:00–17:00">Завтра, 15:00–17:00</option>
-        <option value="Завтра, 17:00–19:00">Завтра, 17:00–19:00</option>
-        <option value="Завтра, 19:00–21:00">Завтра, 19:00–21:00</option>
-        <option value="Завтра, 21:00–23:00">Завтра, 21:00–23:00</option>
-        <option value="Завтра, 23:00–01:00">Завтра, 23:00–01:00</option>
-        <option value="Другое — уточню по телефону">Другое — уточню по телефону</option>
       </select>
       <div class="section-label full">3. Пожелания</div>
       <textarea id="fwishes" class="full" placeholder="Открытка, что передать, особые пожелания (необязательно)"></textarea>
@@ -422,6 +404,38 @@ const formErr = document.getElementById('formErr');
 
 attachPhoneMask(fphone);
 attachPhoneMask(frphone);
+
+// Строит список интервалов "Сегодня"/"Завтра" с 9:00 до 01:00, пропуская
+// на сегодня те интервалы, которые уже полностью прошли к текущему времени
+function buildTimeOptions(){
+  const slots = [9, 11, 13, 15, 17, 19, 21, 23, 25]; // 25 = 01:00 следующего дня
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  function hLabel(h){ return String(h % 24).padStart(2, '0') + ':00'; }
+
+  function addOption(value){
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = value;
+    ftime.appendChild(opt);
+  }
+
+  addOption('Как можно скорее');
+
+  for (let i = 0; i < slots.length - 1; i++){
+    const startH = slots[i], endH = slots[i + 1];
+    if (endH * 60 <= nowMinutes) continue; // этот интервал на сегодня уже прошёл
+    addOption('Сегодня, ' + hLabel(startH) + '–' + hLabel(endH));
+  }
+  for (let i = 0; i < slots.length - 1; i++){
+    const startH = slots[i], endH = slots[i + 1];
+    addOption('Завтра, ' + hLabel(startH) + '–' + hLabel(endH));
+  }
+
+  addOption('Другое — уточню по телефону');
+}
+buildTimeOptions();
 
 function openModal(item, card){
   currentItem = item;
