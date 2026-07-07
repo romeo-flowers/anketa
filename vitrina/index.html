@@ -127,6 +127,44 @@ main{padding:28px 20px 10px;}
   border-radius:2px;
 }
 .order-form .err{color:#a15a2c;font-size:12.5px;display:none;}
+.order-form textarea{
+  border:1px solid var(--line);
+  padding:8px 10px;
+  font-family:inherit;
+  font-size:14px;
+  border-radius:2px;
+  resize:vertical;
+  min-height:44px;
+}
+.order-form .section-label{
+  font-size:11px;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin-top:4px;
+}
+.order-form .section-label:first-child{margin-top:0;}
+.order-form .checkline{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  font-size:13px;
+  color:var(--ink);
+}
+.order-form .checkline input{margin:0;}
+.order-form .recipient-fields{
+  display:none;
+  flex-direction:column;
+  gap:8px;
+}
+.order-form .recipient-fields.show{display:flex;}
+.order-form .delivery-choice{
+  display:flex;
+  gap:16px;
+  font-size:13px;
+}
+.order-form .delivery-choice label{display:flex;align-items:center;gap:5px;}
+.order-form .delivery-choice input{margin:0;}
 
 .card .thanks{display:none;padding-top:6px;border-top:1px solid var(--line);margin-top:6px;font-size:13.5px;}
 .card.sent .order-form{display:none;}
@@ -200,9 +238,24 @@ function renderCard(item, idx){
       '<div class="price">' + fmtPrice(item.price) + '</div>' +
       '<button class="want">Хочу этот букет</button>' +
       '<div class="order-form">' +
+        '<div class="section-label">1. Контакты</div>' +
         '<input type="text" class="fname" placeholder="Ваше имя">' +
-        '<input type="tel" class="fphone" placeholder="Телефон (для Kaspi-перевода)">' +
-        '<div class="err">Укажите имя и телефон</div>' +
+        '<input type="tel" class="fphone" placeholder="Ваш телефон (для Kaspi-перевода)">' +
+        '<label class="checkline"><input type="checkbox" class="fsame" checked> Получатель — это я</label>' +
+        '<div class="recipient-fields">' +
+          '<input type="text" class="frname" placeholder="Имя получателя">' +
+          '<input type="tel" class="frphone" placeholder="Телефон получателя">' +
+        '</div>' +
+        '<div class="section-label">2. Доставка</div>' +
+        '<div class="delivery-choice">' +
+          '<label><input type="radio" name="delivery-' + idx + '" class="fpickup" checked> Самовывоз</label>' +
+          '<label><input type="radio" name="delivery-' + idx + '" class="fdelivery"> Доставка</label>' +
+        '</div>' +
+        '<input type="text" class="faddress" placeholder="Адрес доставки" style="display:none">' +
+        '<input type="text" class="ftime" placeholder="К какому времени нужен букет">' +
+        '<div class="section-label">3. Пожелания</div>' +
+        '<textarea class="fwishes" placeholder="Открытка, что передать, особые пожелания (необязательно)"></textarea>' +
+        '<div class="err">Заполните обязательные поля</div>' +
         '<button class="send">Отправить заявку</button>' +
       '</div>' +
       '<div class="thanks">' +
@@ -213,11 +266,37 @@ function renderCard(item, idx){
 
   card.querySelector('.want').addEventListener('click', () => card.classList.add('open'));
 
+  const sameCb = card.querySelector('.fsame');
+  const recipientFields = card.querySelector('.recipient-fields');
+  sameCb.addEventListener('change', () => {
+    recipientFields.classList.toggle('show', !sameCb.checked);
+  });
+
+  const pickupRadio = card.querySelector('.fpickup');
+  const deliveryRadio = card.querySelector('.fdelivery');
+  const addressInput = card.querySelector('.faddress');
+  function toggleAddress(){ addressInput.style.display = deliveryRadio.checked ? 'block' : 'none'; }
+  pickupRadio.addEventListener('change', toggleAddress);
+  deliveryRadio.addEventListener('change', toggleAddress);
+
   card.querySelector('.send').addEventListener('click', () => {
     const name = card.querySelector('.fname').value.trim();
     const phone = card.querySelector('.fphone').value.trim();
+    const sameRecipient = sameCb.checked;
+    const rname = sameRecipient ? name : card.querySelector('.frname').value.trim();
+    const rphone = sameRecipient ? phone : card.querySelector('.frphone').value.trim();
+    const isDelivery = deliveryRadio.checked;
+    const address = card.querySelector('.faddress').value.trim();
+    const time = card.querySelector('.ftime').value.trim();
+    const wishes = card.querySelector('.fwishes').value.trim();
     const err = card.querySelector('.err');
-    if (!name || phone.replace(/\D/g,'').length < 10){
+
+    const valid = name && phone.replace(/\D/g,'').length >= 10 &&
+      (sameRecipient || (rname && rphone.replace(/\D/g,'').length >= 10)) &&
+      (!isDelivery || address) &&
+      time;
+
+    if (!valid){
       err.style.display = 'block';
       return;
     }
@@ -225,7 +304,14 @@ function renderCard(item, idx){
     fetch(SUBMIT_URL, {
       method: 'POST',
       headers: {'Content-Type':'text/plain'},
-      body: JSON.stringify({ type:'vitrina_order', bouquet:item.name, name:name, phone:phone })
+      body: JSON.stringify({
+        type:'vitrina_order', bouquet:item.name,
+        name:name, phone:phone,
+        recipientName:rname, recipientPhone:rphone,
+        deliveryType: isDelivery ? 'Доставка' : 'Самовывоз',
+        address: isDelivery ? address : '',
+        time:time, wishes:wishes
+      })
     }).catch(()=>{});
     card.classList.remove('open');
     card.classList.add('sent');
