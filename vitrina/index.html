@@ -267,6 +267,29 @@ footer{
   height:16px;
 }
 .modal-form .err{color:#a15a2c;font-size:12.5px;display:none;}
+.address-field{position:relative;}
+.address-suggest{
+  display:none;
+  position:absolute;
+  top:100%;
+  left:0;
+  right:0;
+  background:#fff;
+  border:1px solid var(--line);
+  border-top:none;
+  border-radius:0 0 3px 3px;
+  max-height:180px;
+  overflow-y:auto;
+  z-index:10;
+  box-shadow:0 6px 14px rgba(44,42,39,.1);
+}
+.address-suggest.show{display:block;}
+.address-suggest .item{
+  padding:8px 12px;
+  font-size:13.5px;
+  cursor:pointer;
+}
+.address-suggest .item:hover{background:var(--cream);}
 .modal-form .send{
   background:var(--sage-dark);
   color:#fff;
@@ -333,7 +356,10 @@ footer{
         <label><input type="radio" name="delivery" id="fpickup" checked> Самовывоз</label>
         <label><input type="radio" name="delivery" id="fdelivery"> Доставка</label>
       </div>
-      <input type="text" id="faddress" class="full" placeholder="Адрес доставки" style="display:none">
+      <div class="full address-field" id="addressField" style="display:none">
+        <input type="text" id="faddress" placeholder="Адрес доставки (улица, дом)" autocomplete="off">
+        <div class="address-suggest" id="addressSuggest"></div>
+      </div>
       <select id="ftime" class="full">
         <option value="">К какому времени нужен букет</option>
       </select>
@@ -398,6 +424,8 @@ const frphone = document.getElementById('frphone');
 const fpickup = document.getElementById('fpickup');
 const fdelivery = document.getElementById('fdelivery');
 const faddress = document.getElementById('faddress');
+const addressField = document.getElementById('addressField');
+const addressSuggest = document.getElementById('addressSuggest');
 const ftime = document.getElementById('ftime');
 const fwishes = document.getElementById('fwishes');
 const formErr = document.getElementById('formErr');
@@ -451,8 +479,10 @@ function openModal(item, card){
   frphone.value = '+7 ';
   fpickup.checked = true;
   fdelivery.checked = false;
-  faddress.style.display = 'none';
+  addressField.style.display = 'none';
   faddress.value = '';
+  addressSuggest.classList.remove('show');
+  addressSuggest.innerHTML = '';
   ftime.value = '';
   fwishes.value = '';
   formErr.style.display = 'none';
@@ -469,9 +499,66 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modalOve
 
 fsame.addEventListener('change', () => recipientFields.classList.toggle('show', !fsame.checked));
 
-function toggleAddress(){ faddress.style.display = fdelivery.checked ? 'block' : 'none'; }
+function toggleAddress(){ addressField.style.display = fdelivery.checked ? 'block' : 'none'; }
 fpickup.addEventListener('change', toggleAddress);
 fdelivery.addEventListener('change', toggleAddress);
+
+// ─── Автоподсказка адреса (Yandex Geosuggest, привязано к Костанаю) ───────
+const YANDEX_SUGGEST_KEY = 'ВСТАВЬ_СЮДА_СВОЙ_КЛЮЧ'; // получить бесплатно на yandex.ru/dev
+const KOSTANAY_LL = '63.6246,53.2141'; // центр Костаная — смещает подсказки к городу
+
+let addressDebounce = null;
+
+faddress.addEventListener('input', () => {
+  clearTimeout(addressDebounce);
+  const text = faddress.value.trim();
+  if (text.length < 3 || YANDEX_SUGGEST_KEY.indexOf('ВСТАВЬ') === 0){
+    addressSuggest.classList.remove('show');
+    addressSuggest.innerHTML = '';
+    return;
+  }
+  addressDebounce = setTimeout(() => fetchAddressSuggestions(text), 250);
+});
+
+function fetchAddressSuggestions(text){
+  const url = 'https://suggest-maps.yandex.ru/v1/suggest' +
+    '?apikey=' + encodeURIComponent(YANDEX_SUGGEST_KEY) +
+    '&text=' + encodeURIComponent(text) +
+    '&lang=ru_RU&results=6&types=house,street' +
+    '&ll=' + KOSTANAY_LL + '&spn=0.5,0.3&print_address=1';
+
+  fetch(url)
+    .then(r => r.json())
+    .then(data => renderAddressSuggestions((data && data.results) || []))
+    .catch(() => { addressSuggest.classList.remove('show'); });
+}
+
+function renderAddressSuggestions(results){
+  addressSuggest.innerHTML = '';
+  if (!results.length){
+    addressSuggest.classList.remove('show');
+    return;
+  }
+  results.forEach(r => {
+    const label = (r.address && r.address.formatted_address) ||
+      (r.title ? r.title.text : '') + (r.subtitle ? ', ' + r.subtitle.text : '');
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.textContent = label;
+    div.addEventListener('mousedown', (e) => {
+      e.preventDefault(); // чтобы не сработал blur раньше клика
+      faddress.value = label;
+      addressSuggest.classList.remove('show');
+      addressSuggest.innerHTML = '';
+    });
+    addressSuggest.appendChild(div);
+  });
+  addressSuggest.classList.add('show');
+}
+
+faddress.addEventListener('blur', () => {
+  setTimeout(() => addressSuggest.classList.remove('show'), 150);
+});
 
 document.getElementById('sendBtn').addEventListener('click', () => {
   const name = fname.value.trim();
