@@ -97,77 +97,7 @@ main{padding:28px 20px 10px;}
 }
 .card button.want:hover{background:var(--sage-dark);}
 
-.card .order-form{
-  display:none;
-  flex-direction:column;
-  gap:8px;
-  padding-top:6px;
-  border-top:1px solid var(--line);
-  margin-top:6px;
-}
-.card.open .order-form{display:flex;}
-.card.open button.want{display:none;}
-.order-form input{
-  border:1px solid var(--line);
-  padding:8px 10px;
-  font-family:inherit;
-  font-size:14px;
-  border-radius:2px;
-}
-.order-form .send{
-  background:var(--sage-dark);
-  color:#fff;
-  border:none;
-  padding:9px;
-  font-family:inherit;
-  font-size:13px;
-  letter-spacing:.06em;
-  text-transform:uppercase;
-  cursor:pointer;
-  border-radius:2px;
-}
-.order-form .err{color:#a15a2c;font-size:12.5px;display:none;}
-.order-form textarea{
-  border:1px solid var(--line);
-  padding:8px 10px;
-  font-family:inherit;
-  font-size:14px;
-  border-radius:2px;
-  resize:vertical;
-  min-height:44px;
-}
-.order-form .section-label{
-  font-size:11px;
-  letter-spacing:.1em;
-  text-transform:uppercase;
-  color:var(--muted);
-  margin-top:4px;
-}
-.order-form .section-label:first-child{margin-top:0;}
-.order-form .checkline{
-  display:flex;
-  align-items:center;
-  gap:6px;
-  font-size:13px;
-  color:var(--ink);
-}
-.order-form .checkline input{margin:0;}
-.order-form .recipient-fields{
-  display:none;
-  flex-direction:column;
-  gap:8px;
-}
-.order-form .recipient-fields.show{display:flex;}
-.order-form .delivery-choice{
-  display:flex;
-  gap:16px;
-  font-size:13px;
-}
-.order-form .delivery-choice label{display:flex;align-items:center;gap:5px;}
-.order-form .delivery-choice input{margin:0;}
-
 .card .thanks{display:none;padding-top:6px;border-top:1px solid var(--line);margin-top:6px;font-size:13.5px;}
-.card.sent .order-form{display:none;}
 .card.sent button.want{display:none;}
 .card.sent .thanks{display:flex;flex-direction:column;gap:8px;}
 .thanks .kaspi-link{
@@ -197,6 +127,133 @@ footer{
   color:var(--muted);
   text-transform:uppercase;
 }
+
+/* ─── Модальное окно заявки ─────────────────────────────── */
+.modal-overlay{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(44,42,39,.55);
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  z-index:1000;
+}
+.modal-overlay.open{display:flex;}
+.modal{
+  background:var(--paper);
+  border-radius:6px;
+  max-width:560px;
+  width:100%;
+  max-height:88vh;
+  overflow-y:auto;
+  padding:30px 30px 28px;
+  position:relative;
+}
+.modal-close{
+  position:absolute;
+  top:14px;
+  right:16px;
+  background:none;
+  border:none;
+  font-size:24px;
+  line-height:1;
+  color:var(--muted);
+  cursor:pointer;
+  padding:4px;
+}
+.modal-close:hover{color:var(--ink);}
+.modal-item{
+  display:flex;
+  gap:14px;
+  align-items:center;
+  padding-bottom:18px;
+  margin-bottom:20px;
+  border-bottom:1px solid var(--line);
+}
+.modal-photo{
+  width:64px;
+  height:64px;
+  border-radius:4px;
+  background:var(--cream) center/cover no-repeat;
+  flex-shrink:0;
+}
+.modal-name{font-family:'Playfair Display',Georgia,serif;font-size:18px;line-height:1.3;}
+.modal-price{font-size:14px;color:var(--sage-dark);font-weight:600;margin-top:3px;}
+
+.modal-form{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:14px 16px;
+}
+.modal-form .full{grid-column:1 / -1;}
+.modal-form input:not([type=checkbox]):not([type=radio]),
+.modal-form textarea{
+  border:1px solid var(--line);
+  padding:10px 12px;
+  font-family:inherit;
+  font-size:14px;
+  border-radius:3px;
+  width:100%;
+  background:#fff;
+}
+.modal-form textarea{resize:vertical;min-height:64px;}
+.modal-form .section-label{
+  font-size:11px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--sage-dark);
+  padding-bottom:7px;
+  border-bottom:1px solid var(--line);
+  margin-top:6px;
+}
+.modal-form .section-label.first{margin-top:0;}
+.modal-form .checkline{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:13.5px;
+  color:var(--ink);
+}
+.modal-form .recipient-fields{
+  display:none;
+  grid-column:1 / -1;
+  gap:14px;
+  grid-template-columns:1fr 1fr;
+}
+.modal-form .recipient-fields.show{display:grid;}
+.modal-form .delivery-choice{
+  display:flex;
+  gap:22px;
+  font-size:14px;
+}
+.modal-form .delivery-choice label{display:flex;align-items:center;gap:6px;}
+.modal-form input[type=checkbox],
+.modal-form input[type=radio]{
+  accent-color:var(--sage-dark);
+  width:16px;
+  height:16px;
+}
+.modal-form .err{color:#a15a2c;font-size:12.5px;display:none;}
+.modal-form .send{
+  background:var(--sage-dark);
+  color:#fff;
+  border:none;
+  padding:13px;
+  font-family:inherit;
+  font-size:13.5px;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  cursor:pointer;
+  border-radius:3px;
+  margin-top:4px;
+}
+.modal-form .send:hover{background:var(--sage);}
+
+@media (max-width:480px){
+  .modal-form{grid-template-columns:1fr;}
+  .modal-form .recipient-fields{grid-template-columns:1fr;}
+}
 </style>
 </head>
 <body>
@@ -216,6 +273,40 @@ footer{
   <footer>Romeo Flowers</footer>
 </div>
 
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <button class="modal-close" id="modalClose" aria-label="Закрыть">&times;</button>
+    <div class="modal-item">
+      <div class="modal-photo" id="modalPhoto"></div>
+      <div>
+        <div class="modal-name" id="modalName"></div>
+        <div class="modal-price" id="modalPrice"></div>
+      </div>
+    </div>
+    <div class="modal-form">
+      <div class="section-label full first">1. Контакты</div>
+      <input type="text" id="fname" placeholder="Ваше имя">
+      <input type="tel" id="fphone" placeholder="Ваш телефон (для Kaspi-перевода)">
+      <label class="checkline full"><input type="checkbox" id="fsame" checked> Получатель — это я</label>
+      <div class="recipient-fields" id="recipientFields">
+        <input type="text" id="frname" placeholder="Имя получателя">
+        <input type="tel" id="frphone" placeholder="Телефон получателя">
+      </div>
+      <div class="section-label full">2. Доставка</div>
+      <div class="delivery-choice full">
+        <label><input type="radio" name="delivery" id="fpickup" checked> Самовывоз</label>
+        <label><input type="radio" name="delivery" id="fdelivery"> Доставка</label>
+      </div>
+      <input type="text" id="faddress" class="full" placeholder="Адрес доставки" style="display:none">
+      <input type="text" id="ftime" class="full" placeholder="К какому времени нужен букет">
+      <div class="section-label full">3. Пожелания</div>
+      <textarea id="fwishes" class="full" placeholder="Открытка, что передать, особые пожелания (необязательно)"></textarea>
+      <div class="err full" id="formErr">Заполните обязательные поля</div>
+      <button class="send full" id="sendBtn">Отправить заявку</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SUBMIT_URL = 'https://script.google.com/macros/s/AKfycbx0FYyE3hckyyyhzZPbf4X2gELlhLoGNj8YbRfJcjj1bTbKlKjo-n16cMUWN7SBnxDepw/exec';
 const KASPI_LINK = 'https://pay.kaspi.kz/pay/qlv5kzz7';
@@ -225,6 +316,101 @@ function fmtPrice(p){
   if (isNaN(n)) return p;
   return n.toLocaleString('ru-RU') + ' ₸';
 }
+
+let currentItem = null;
+let currentCard = null;
+
+const modalOverlay = document.getElementById('modalOverlay');
+const modalPhoto = document.getElementById('modalPhoto');
+const modalName = document.getElementById('modalName');
+const modalPrice = document.getElementById('modalPrice');
+const fname = document.getElementById('fname');
+const fphone = document.getElementById('fphone');
+const fsame = document.getElementById('fsame');
+const recipientFields = document.getElementById('recipientFields');
+const frname = document.getElementById('frname');
+const frphone = document.getElementById('frphone');
+const fpickup = document.getElementById('fpickup');
+const fdelivery = document.getElementById('fdelivery');
+const faddress = document.getElementById('faddress');
+const ftime = document.getElementById('ftime');
+const fwishes = document.getElementById('fwishes');
+const formErr = document.getElementById('formErr');
+
+function openModal(item, card){
+  currentItem = item;
+  currentCard = card;
+  modalPhoto.style.backgroundImage = item.photo ? 'url(\'' + item.photo + '\')' : 'none';
+  modalName.textContent = item.name;
+  modalPrice.textContent = fmtPrice(item.price);
+  fname.value = '';
+  fphone.value = '';
+  fsame.checked = true;
+  recipientFields.classList.remove('show');
+  frname.value = '';
+  frphone.value = '';
+  fpickup.checked = true;
+  fdelivery.checked = false;
+  faddress.style.display = 'none';
+  faddress.value = '';
+  ftime.value = '';
+  fwishes.value = '';
+  formErr.style.display = 'none';
+  modalOverlay.classList.add('open');
+}
+
+function closeModal(){
+  modalOverlay.classList.remove('open');
+}
+
+document.getElementById('modalClose').addEventListener('click', closeModal);
+modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) closeModal(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modalOverlay.classList.contains('open')) closeModal(); });
+
+fsame.addEventListener('change', () => recipientFields.classList.toggle('show', !fsame.checked));
+
+function toggleAddress(){ faddress.style.display = fdelivery.checked ? 'block' : 'none'; }
+fpickup.addEventListener('change', toggleAddress);
+fdelivery.addEventListener('change', toggleAddress);
+
+document.getElementById('sendBtn').addEventListener('click', () => {
+  const name = fname.value.trim();
+  const phone = fphone.value.trim();
+  const sameRecipient = fsame.checked;
+  const rname = sameRecipient ? name : frname.value.trim();
+  const rphone = sameRecipient ? phone : frphone.value.trim();
+  const isDelivery = fdelivery.checked;
+  const address = faddress.value.trim();
+  const time = ftime.value.trim();
+  const wishes = fwishes.value.trim();
+
+  const valid = name && phone.replace(/\D/g,'').length >= 10 &&
+    (sameRecipient || (rname && rphone.replace(/\D/g,'').length >= 10)) &&
+    (!isDelivery || address) &&
+    time;
+
+  if (!valid){
+    formErr.style.display = 'block';
+    return;
+  }
+  formErr.style.display = 'none';
+
+  fetch(SUBMIT_URL, {
+    method: 'POST',
+    headers: {'Content-Type':'text/plain'},
+    body: JSON.stringify({
+      type:'vitrina_order', bouquet: currentItem.name,
+      name:name, phone:phone,
+      recipientName:rname, recipientPhone:rphone,
+      deliveryType: isDelivery ? 'Доставка' : 'Самовывоз',
+      address: isDelivery ? address : '',
+      time:time, wishes:wishes
+    })
+  }).catch(()=>{});
+
+  if (currentCard) currentCard.classList.add('sent');
+  closeModal();
+});
 
 function renderCard(item, idx){
   const card = document.createElement('div');
@@ -237,85 +423,13 @@ function renderCard(item, idx){
       '<div class="name">' + item.name + '</div>' +
       '<div class="price">' + fmtPrice(item.price) + '</div>' +
       '<button class="want">Хочу этот букет</button>' +
-      '<div class="order-form">' +
-        '<div class="section-label">1. Контакты</div>' +
-        '<input type="text" class="fname" placeholder="Ваше имя">' +
-        '<input type="tel" class="fphone" placeholder="Ваш телефон (для Kaspi-перевода)">' +
-        '<label class="checkline"><input type="checkbox" class="fsame" checked> Получатель — это я</label>' +
-        '<div class="recipient-fields">' +
-          '<input type="text" class="frname" placeholder="Имя получателя">' +
-          '<input type="tel" class="frphone" placeholder="Телефон получателя">' +
-        '</div>' +
-        '<div class="section-label">2. Доставка</div>' +
-        '<div class="delivery-choice">' +
-          '<label><input type="radio" name="delivery-' + idx + '" class="fpickup" checked> Самовывоз</label>' +
-          '<label><input type="radio" name="delivery-' + idx + '" class="fdelivery"> Доставка</label>' +
-        '</div>' +
-        '<input type="text" class="faddress" placeholder="Адрес доставки" style="display:none">' +
-        '<input type="text" class="ftime" placeholder="К какому времени нужен букет">' +
-        '<div class="section-label">3. Пожелания</div>' +
-        '<textarea class="fwishes" placeholder="Открытка, что передать, особые пожелания (необязательно)"></textarea>' +
-        '<div class="err">Заполните обязательные поля</div>' +
-        '<button class="send">Отправить заявку</button>' +
-      '</div>' +
       '<div class="thanks">' +
         '<div>Заявку получили — свяжемся и вышлем Kaspi-перевод на указанный номер.</div>' +
         '<a class="kaspi-link" href="' + KASPI_LINK + '">Или оплатить сразу самому по Kaspi</a>' +
       '</div>' +
     '</div>';
 
-  card.querySelector('.want').addEventListener('click', () => card.classList.add('open'));
-
-  const sameCb = card.querySelector('.fsame');
-  const recipientFields = card.querySelector('.recipient-fields');
-  sameCb.addEventListener('change', () => {
-    recipientFields.classList.toggle('show', !sameCb.checked);
-  });
-
-  const pickupRadio = card.querySelector('.fpickup');
-  const deliveryRadio = card.querySelector('.fdelivery');
-  const addressInput = card.querySelector('.faddress');
-  function toggleAddress(){ addressInput.style.display = deliveryRadio.checked ? 'block' : 'none'; }
-  pickupRadio.addEventListener('change', toggleAddress);
-  deliveryRadio.addEventListener('change', toggleAddress);
-
-  card.querySelector('.send').addEventListener('click', () => {
-    const name = card.querySelector('.fname').value.trim();
-    const phone = card.querySelector('.fphone').value.trim();
-    const sameRecipient = sameCb.checked;
-    const rname = sameRecipient ? name : card.querySelector('.frname').value.trim();
-    const rphone = sameRecipient ? phone : card.querySelector('.frphone').value.trim();
-    const isDelivery = deliveryRadio.checked;
-    const address = card.querySelector('.faddress').value.trim();
-    const time = card.querySelector('.ftime').value.trim();
-    const wishes = card.querySelector('.fwishes').value.trim();
-    const err = card.querySelector('.err');
-
-    const valid = name && phone.replace(/\D/g,'').length >= 10 &&
-      (sameRecipient || (rname && rphone.replace(/\D/g,'').length >= 10)) &&
-      (!isDelivery || address) &&
-      time;
-
-    if (!valid){
-      err.style.display = 'block';
-      return;
-    }
-    err.style.display = 'none';
-    fetch(SUBMIT_URL, {
-      method: 'POST',
-      headers: {'Content-Type':'text/plain'},
-      body: JSON.stringify({
-        type:'vitrina_order', bouquet:item.name,
-        name:name, phone:phone,
-        recipientName:rname, recipientPhone:rphone,
-        deliveryType: isDelivery ? 'Доставка' : 'Самовывоз',
-        address: isDelivery ? address : '',
-        time:time, wishes:wishes
-      })
-    }).catch(()=>{});
-    card.classList.remove('open');
-    card.classList.add('sent');
-  });
+  card.querySelector('.want').addEventListener('click', () => openModal(item, card));
 
   return card;
 }
