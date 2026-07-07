@@ -188,7 +188,8 @@ footer{
 }
 .modal-form .full{grid-column:1 / -1;}
 .modal-form input:not([type=checkbox]):not([type=radio]),
-.modal-form textarea{
+.modal-form textarea,
+.modal-form select{
   border:1px solid var(--line);
   padding:10px 12px;
   font-family:inherit;
@@ -196,7 +197,9 @@ footer{
   border-radius:3px;
   width:100%;
   background:#fff;
+  color:var(--ink);
 }
+.modal-form select{appearance:auto;}
 .modal-form textarea{resize:vertical;min-height:64px;}
 .modal-form .section-label{
   font-size:11px;
@@ -298,7 +301,17 @@ footer{
         <label><input type="radio" name="delivery" id="fdelivery"> Доставка</label>
       </div>
       <input type="text" id="faddress" class="full" placeholder="Адрес доставки" style="display:none">
-      <input type="text" id="ftime" class="full" placeholder="К какому времени нужен букет">
+      <select id="ftime" class="full">
+        <option value="">К какому времени нужен букет</option>
+        <option value="Как можно скорее">Как можно скорее</option>
+        <option value="Сегодня, до 15:00">Сегодня, до 15:00</option>
+        <option value="Сегодня, 15:00–18:00">Сегодня, 15:00–18:00</option>
+        <option value="Сегодня, 18:00–21:00">Сегодня, 18:00–21:00</option>
+        <option value="Завтра, утром (9:00–12:00)">Завтра, утром (9:00–12:00)</option>
+        <option value="Завтра, днём (12:00–17:00)">Завтра, днём (12:00–17:00)</option>
+        <option value="Завтра, вечером (17:00–21:00)">Завтра, вечером (17:00–21:00)</option>
+        <option value="Другое — уточню по телефону">Другое — уточню по телефону</option>
+      </select>
       <div class="section-label full">3. Пожелания</div>
       <textarea id="fwishes" class="full" placeholder="Открытка, что передать, особые пожелания (необязательно)"></textarea>
       <div class="err full" id="formErr">Заполните обязательные поля</div>
@@ -324,6 +337,26 @@ function cleanName(name){
   return (name || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
 }
 
+// Маска телефона: набирает как угодно, приводит к "+7 XXX XXX XX XX"
+function formatPhoneMask(value){
+  let digits = value.replace(/\D/g, '');
+  if (digits.startsWith('8')) digits = '7' + digits.slice(1);
+  if (!digits.startsWith('7')) digits = '7' + digits;
+  digits = digits.slice(0, 11);
+  let out = '+7';
+  if (digits.length > 1) out += ' ' + digits.slice(1, 4);
+  if (digits.length > 4) out += ' ' + digits.slice(4, 7);
+  if (digits.length > 7) out += ' ' + digits.slice(7, 9);
+  if (digits.length > 9) out += ' ' + digits.slice(9, 11);
+  return out;
+}
+function attachPhoneMask(input){
+  input.addEventListener('input', () => {
+    input.value = input.value ? formatPhoneMask(input.value) : '';
+    input.setSelectionRange(input.value.length, input.value.length);
+  });
+}
+
 let currentItem = null;
 let currentCard = null;
 
@@ -343,6 +376,9 @@ const faddress = document.getElementById('faddress');
 const ftime = document.getElementById('ftime');
 const fwishes = document.getElementById('fwishes');
 const formErr = document.getElementById('formErr');
+
+attachPhoneMask(fphone);
+attachPhoneMask(frphone);
 
 function openModal(item, card){
   currentItem = item;
