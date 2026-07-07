@@ -286,7 +286,7 @@ footer{
     <div class="modal-form">
       <div class="section-label full first">1. Контакты</div>
       <input type="text" id="fname" placeholder="Ваше имя">
-      <input type="tel" id="fphone" placeholder="Ваш телефон (для Kaspi-перевода)">
+      <input type="tel" id="fphone" placeholder="Ваш телефон (на этот номер выставим счёт)">
       <label class="checkline full"><input type="checkbox" id="fsame" checked> Получатель — это я</label>
       <div class="recipient-fields" id="recipientFields">
         <input type="text" id="frname" placeholder="Имя получателя">
@@ -317,6 +317,13 @@ function fmtPrice(p){
   return n.toLocaleString('ru-RU') + ' ₸';
 }
 
+// Убирает служебную пометку упаковки в скобках в конце названия (напр. "(Ваниль)", "(Единый)") —
+// это внутреннее обозначение варианта упаковки в Posiflora, покупателю оно не нужно.
+// В саму заявку (Telegram/таблица) уходит оригинальное item.name — флористу это пригодится.
+function cleanName(name){
+  return (name || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+}
+
 let currentItem = null;
 let currentCard = null;
 
@@ -341,7 +348,7 @@ function openModal(item, card){
   currentItem = item;
   currentCard = card;
   modalPhoto.style.backgroundImage = item.photo ? 'url(\'' + item.photo + '\')' : 'none';
-  modalName.textContent = item.name;
+  modalName.textContent = cleanName(item.name);
   modalPrice.textContent = fmtPrice(item.price);
   fname.value = '';
   fphone.value = '';
@@ -420,7 +427,7 @@ function renderCard(item, idx){
       (item.photo ? '' : 'фото скоро') +
     '</div>' +
     '<div class="body">' +
-      '<div class="name">' + item.name + '</div>' +
+      '<div class="name">' + cleanName(item.name) + '</div>' +
       '<div class="price">' + fmtPrice(item.price) + '</div>' +
       '<button class="want">Хочу этот букет</button>' +
       '<div class="thanks">' +
