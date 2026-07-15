@@ -495,13 +495,20 @@ function resetCheckoutBonus(){
   checkoutBonusPoints = 0;
 }
 
-function checkCheckoutBonus(phone){
-  fetch(SUBMIT_URL, {
+function fetchBonusCheck(phone){
+  return fetch(SUBMIT_URL, {
     method: 'POST',
     headers: {'Content-Type':'text/plain'},
     body: JSON.stringify({ type: 'vitrina_bonus_check', phone: phone })
-  })
-    .then(r => r.json())
+  }).then(r => r.json());
+}
+
+// Posiflora иногда отвечает с перебоями (302→редирект-петля, проявляется в
+// консоли как CORS-ошибка) — не баг кода, подтверждено повторным запросом тем
+// же кадром. Один автоповтор сглаживает эти разовые сбои.
+function checkCheckoutBonus(phone){
+  fetchBonusCheck(phone)
+    .catch(() => new Promise(resolve => setTimeout(resolve, 800)).then(() => fetchBonusCheck(phone)))
     .then(res => {
       if (checkoutBonusRegistered) return;
       if (res && res.found){
@@ -547,12 +554,15 @@ cbonusRegisterBtn.addEventListener('click', () => {
   }
   cbonusRegisterBtn.disabled = true;
   cbonusRegisterBtn.textContent = 'Регистрируем…';
-  fetch(SUBMIT_URL, {
+  const fetchRegister = () => fetch(SUBMIT_URL, {
     method: 'POST',
     headers: {'Content-Type':'text/plain'},
     body: JSON.stringify({ type: 'vitrina_register', phone: fphone.value.trim(), name: regName })
-  })
-    .then(r => r.json())
+  }).then(r => r.json());
+  // Повтор безопасен — бэкенд дедупит по телефону (vitrinaReg_<phone>), повторный
+  // вызов не начислит баллы дважды, даже если первая попытка успела пройти на сервере.
+  fetchRegister()
+    .catch(() => new Promise(resolve => setTimeout(resolve, 800)).then(fetchRegister))
     .then(res => {
       if (res && res.ok){
         checkoutBonusRegistered = true;
