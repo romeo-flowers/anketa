@@ -311,6 +311,31 @@ footer{
 }
 .modal-form .send:hover{background:var(--sage);}
 
+.bonus-box{
+  background:var(--cream);
+  border:1px solid var(--line);
+  border-radius:3px;
+  padding:10px 12px;
+  margin-top:6px;
+}
+.bonus-balance{
+  font-size:13px;
+  color:var(--ink);
+}
+.bonus-register-btn{
+  background:none;
+  color:var(--sage-dark);
+  border:1px solid var(--sage-dark);
+  padding:8px 12px;
+  font-family:inherit;
+  font-size:12.5px;
+  cursor:pointer;
+  border-radius:3px;
+  margin-top:6px;
+}
+.bonus-register-btn:hover{background:var(--sage-dark);color:#fff;}
+.bonus-register-btn:disabled{opacity:.6;cursor:default;}
+
 @media (max-width:480px){
   .modal-form{grid-template-columns:1fr;}
   .modal-form .recipient-fields{grid-template-columns:1fr;}
@@ -353,6 +378,13 @@ footer{
       <input type="text" id="fname" placeholder="Ваше имя">
       <input type="tel" id="fphone" placeholder="Телефон (выставим счёт Kaspi)">
       <div class="field-hint full">На этот номер выставим счёт Kaspi</div>
+      <div class="bonus-box full" id="cbonusBox" style="display:none">
+        <div class="bonus-balance" id="cbonusBalanceText"></div>
+        <button type="button" class="bonus-register-btn" id="cbonusRegisterBtn" style="display:none">Зарегистрироваться и получить 1000 баллов</button>
+        <label class="checkline" id="cbonusUseLine" style="display:none;margin-top:8px;">
+          <input type="checkbox" id="cbonusUse"> Хочу списать баллы с этого заказа (сумму согласуем с менеджером)
+        </label>
+      </div>
       <label class="checkline full"><input type="checkbox" id="fsame" checked> Получатель — это я</label>
       <div class="recipient-fields" id="recipientFields">
         <input type="text" id="frname" placeholder="Имя получателя">
@@ -440,6 +472,103 @@ const formErr = document.getElementById('formErr');
 attachPhoneMask(fphone);
 attachPhoneMask(frphone);
 
+// ─── Баллы прямо в форме заказа: видно баланс, для новых — регистрация.
+// Имя берём из уже существующего поля fname (не дублируем поле). ──
+const cbonusBox = document.getElementById('cbonusBox');
+const cbonusBalanceText = document.getElementById('cbonusBalanceText');
+const cbonusRegisterBtn = document.getElementById('cbonusRegisterBtn');
+const cbonusUseLine = document.getElementById('cbonusUseLine');
+const cbonusUse = document.getElementById('cbonusUse');
+let checkoutBonusDebounce = null;
+let checkoutBonusRegistered = false;
+let checkoutBonusPoints = 0;
+
+function resetCheckoutBonus(){
+  cbonusBox.style.display = 'none';
+  cbonusBalanceText.textContent = '';
+  cbonusRegisterBtn.style.display = 'none';
+  cbonusRegisterBtn.disabled = false;
+  cbonusRegisterBtn.textContent = 'Зарегистрироваться и получить 1000 баллов';
+  cbonusUseLine.style.display = 'none';
+  cbonusUse.checked = false;
+  checkoutBonusRegistered = false;
+  checkoutBonusPoints = 0;
+}
+
+function checkCheckoutBonus(phone){
+  fetch(SUBMIT_URL, {
+    method: 'POST',
+    headers: {'Content-Type':'text/plain'},
+    body: JSON.stringify({ type: 'vitrina_bonus_check', phone: phone })
+  })
+    .then(r => r.json())
+    .then(res => {
+      if (checkoutBonusRegistered) return;
+      if (res && res.found){
+        checkoutBonusPoints = res.points || 0;
+        cbonusBox.style.display = 'block';
+        cbonusBalanceText.textContent = 'У вас на счету ' + checkoutBonusPoints + ' бонусных баллов 🌸';
+        cbonusRegisterBtn.style.display = 'none';
+        cbonusUseLine.style.display = checkoutBonusPoints > 0 ? 'flex' : 'none';
+      } else if (res && !res.error){
+        cbonusBox.style.display = 'block';
+        cbonusBalanceText.textContent = 'Получите бонусы за регистрацию';
+        cbonusRegisterBtn.style.display = 'inline-block';
+        cbonusUseLine.style.display = 'none';
+      } else {
+        cbonusBox.style.display = 'none';
+        cbonusUseLine.style.display = 'none';
+      }
+    })
+    .catch(() => { cbonusBox.style.display = 'none'; });
+}
+
+fphone.addEventListener('input', () => {
+  clearTimeout(checkoutBonusDebounce);
+  if (checkoutBonusRegistered) return;
+  const digits = fphone.value.replace(/\D/g, '');
+  if (digits.length < 11){
+    cbonusBox.style.display = 'none';
+    cbonusUseLine.style.display = 'none';
+    return;
+  }
+  cbonusBox.style.display = 'block';
+  cbonusBalanceText.textContent = 'Проверяем баллы…';
+  cbonusRegisterBtn.style.display = 'none';
+  cbonusUseLine.style.display = 'none';
+  checkoutBonusDebounce = setTimeout(() => checkCheckoutBonus(fphone.value.trim()), 500);
+});
+
+cbonusRegisterBtn.addEventListener('click', () => {
+  const regName = fname.value.trim();
+  if (!regName){
+    cbonusBalanceText.textContent = 'Сначала впишите имя в поле выше ↑';
+    return;
+  }
+  cbonusRegisterBtn.disabled = true;
+  cbonusRegisterBtn.textContent = 'Регистрируем…';
+  fetch(SUBMIT_URL, {
+    method: 'POST',
+    headers: {'Content-Type':'text/plain'},
+    body: JSON.stringify({ type: 'vitrina_register', phone: fphone.value.trim(), name: regName })
+  })
+    .then(r => r.json())
+    .then(res => {
+      if (res && res.ok){
+        checkoutBonusRegistered = true;
+        cbonusBalanceText.textContent = 'Готово! Начислили ' + res.points + ' баллов — используете их при следующей покупке 🎉';
+        cbonusRegisterBtn.style.display = 'none';
+      } else {
+        cbonusRegisterBtn.disabled = false;
+        cbonusRegisterBtn.textContent = 'Не получилось, попробуйте ещё раз';
+      }
+    })
+    .catch(() => {
+      cbonusRegisterBtn.disabled = false;
+      cbonusRegisterBtn.textContent = 'Не получилось, попробуйте ещё раз';
+    });
+});
+
 // Строит список интервалов "Сегодня"/"Завтра" с 9:00 до 01:00, пропуская
 // на сегодня те интервалы, которые уже полностью прошли к текущему времени
 function buildTimeOptions(){
@@ -493,6 +622,7 @@ function openModal(item, card){
   ftime.value = '';
   fwishes.value = '';
   formErr.style.display = 'none';
+  resetCheckoutBonus();
   modalOverlay.classList.add('open');
 }
 
@@ -583,6 +713,8 @@ document.getElementById('sendBtn').addEventListener('click', () => {
   }
   formErr.style.display = 'none';
 
+  const useBonusPoints = cbonusUse.checked;
+
   fetch(SUBMIT_URL, {
     method: 'POST',
     headers: {'Content-Type':'text/plain'},
@@ -592,7 +724,9 @@ document.getElementById('sendBtn').addEventListener('click', () => {
       recipientName:rname, recipientPhone:rphone,
       deliveryType: isDelivery ? 'Доставка' : 'Самовывоз',
       address: isDelivery ? address : '',
-      time:time, wishes:wishes
+      time:time, wishes:wishes,
+      useBonusPoints: useBonusPoints,
+      bonusPointsBalance: useBonusPoints ? checkoutBonusPoints : 0
     })
   }).catch(()=>{});
 
