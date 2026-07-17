@@ -672,18 +672,29 @@
     formData.custom_event_name = document.getElementById('custom_event_name').value.trim();
     formData.custom_event_date = getDate('custom_event');
 
-    // Собираем динамически добавленные события
+    // Собираем динамически добавленные события.
+    // Было `if (name || (day && mon))` — по ИЛИ, поэтому сохранялось и наполовину
+    // заполненное: событие с названием, но без даты уезжало на сервер как {name:"Э",date:""}.
+    // Напомнить по нему нельзя (нет даты), в таблице лежало мусором, а клиент был уверен,
+    // что дату оставил. Теперь просим дозаполнить вместо молчаливой потери.
+    // Дату без названия пропускаем сознательно: повод у клиента есть, название подставит
+    // бэкенд («важной даты») — см. dailyBirthdayCheck.
     var extraRows = document.querySelectorAll('#extra-dates .extra-row');
     var extraEvents = [];
+    var missingDate = false;
     extraRows.forEach(function(row) {
       var id = row.id.replace('extra-row-', '');
       var name = document.getElementById('extra_name_' + id).value.trim();
       var day  = document.getElementById('extra_day_'  + id).value;
       var mon  = document.getElementById('extra_month_' + id).value;
-      if (name || (day && mon)) {
-        extraEvents.push({ name: name, date: (day && mon) ? '2000-' + mon + '-' + day : '' });
-      }
+      if (!name && !(day && mon)) return;              // строка не тронута — молча пропускаем
+      if (!(day && mon)) { missingDate = true; return; } // название есть, даты нет — скажем клиенту
+      extraEvents.push({ name: name, date: '2000-' + mon + '-' + day });
     });
+    if (missingDate) {
+      showError('Укажите дату для своего события — без неё мы не сможем напомнить.');
+      return;
+    }
     formData.extra_events = JSON.stringify(extraEvents);
 
     var filled = DATE_FIELDS.filter(function(f) { return formData[f]; }).length;
