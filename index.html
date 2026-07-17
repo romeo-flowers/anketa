@@ -127,7 +127,8 @@
     }
     .req { color: #8ca28c; font-size: 14px; line-height: 1; margin-top: -1px; }
 
-    .field input[type="text"] {
+    .field input[type="text"],
+    .field input[type="tel"] {
       width: 100%;
       padding: 10px 13px;
       border: 1px solid #ddd8d0;
@@ -139,9 +140,15 @@
       outline: none;
       transition: border-color 0.2s, background 0.2s;
     }
-    .field input[type="text"]:focus {
+    .field input[type="text"]:focus,
+    .field input[type="tel"]:focus {
       border-color: #8ca28c;
       background: white;
+    }
+    .phone-hint {
+      font-size: 10px;
+      color: #a8a294;
+      margin-top: 4px;
     }
 
     /* ─── Date pair ─── */
@@ -392,6 +399,15 @@
         <input type="text" id="name" placeholder="Как к вам обращаться?" autocomplete="given-name">
       </div>
 
+      <!-- Телефон спрашиваем ТОЛЬКО когда его нет в ссылке (анкету открыли из сторис / рекламы /
+           шапки профиля). Клиент из WhatsApp приходит с ?phone= и этого поля не увидит.
+           Показом управляет init() — см. maybeAskPhone(). -->
+      <div class="field" id="phone-field" style="display:none">
+        <label>Ваш номер <span class="req">*</span></label>
+        <input type="tel" id="phone-input" inputmode="tel" autocomplete="tel" placeholder="+7 (___) ___-__-__">
+        <div class="phone-hint">На него привяжем баллы и пришлём напоминания</div>
+      </div>
+
       <div class="section-title">Дни рождения</div>
 
       <div class="field">
@@ -519,7 +535,37 @@
     populateSelects();
     setGreeting();
     prefillName();
+    maybeAskPhone();
     loadConfig();
+  }
+
+  // Телефон приходит в ссылке из WhatsApp (?phone=). Но ссылку на анкету вешаем и в сторис,
+  // и в рекламу, и в шапку профиля — там параметра нет. Раньше такой человек заполнял всё
+  // и получал «Ссылка недействительна» — тупик. Теперь спрашиваем номер сами.
+  function maybeAskPhone() {
+    var fromLink = getPhoneFromLink();
+    if (fromLink) return;   // пришёл из WhatsApp — поля не видит, ничего не меняется
+    var field = document.getElementById('phone-field');
+    if (field) field.style.display = '';
+  }
+
+  function isPhoneAsked() {
+    var field = document.getElementById('phone-field');
+    return !!(field && field.style.display !== 'none');
+  }
+
+  // Телефон из ссылки: скрытое поле (подставляет Apps Script) или ?phone= в URL.
+  function getPhoneFromLink() {
+    var hiddenVal = document.getElementById('phone').value.trim();
+    if (hiddenVal && hiddenVal.indexOf('<' + '?') === -1) return hiddenVal;
+    return getUrlParam('phone');
+  }
+
+  // Приводим к 10 цифрам — тот же вид, что нормализует бэкенд (normalizePhone берёт последние 10).
+  // 8 707…, +7 707…, 707… — всё сводится к 707…
+  function normalizeKzPhone(raw) {
+    var digits = String(raw || '').replace(/\D/g, '');
+    return digits.length >= 10 ? digits.slice(-10) : '';
   }
 
   function populateSelects() {
@@ -658,7 +704,14 @@
     var name  = document.getElementById('name').value.trim();
 
     if (!phone) {
-      showError('Ссылка недействительна. Обратитесь к продавцу за новой ссылкой.');
+      // Разные ситуации — разные сообщения. Пришёл по битой ссылке из WhatsApp — виновата ссылка.
+      // Пришёл из сторис и не ввёл номер — просто попросим ввести, а не пугаем «недействительна».
+      if (isPhoneAsked()) {
+        showError('Введите номер телефона — к нему привяжем баллы.');
+        document.getElementById('phone-input').focus();
+      } else {
+        showError('Ссылка недействительна. Обратитесь к продавцу за новой ссылкой.');
+      }
       return;
     }
     if (!name) {
@@ -718,11 +771,12 @@
   }
 
   function getPhone() {
-    var hiddenVal = document.getElementById('phone').value.trim();
-    // Если Apps Script подставил значение — используем его
-    if (hiddenVal && hiddenVal.indexOf('<' + '?') === -1) return hiddenVal;
-    // Иначе берём из URL (preview)
-    return getUrlParam('phone');
+    // 1. Из ссылки: скрытое поле (Apps Script) или ?phone= в URL — путь клиента из WhatsApp.
+    var fromLink = getPhoneFromLink();
+    if (fromLink) return fromLink;
+    // 2. Ссылка без телефона (сторис / реклама / профиль) — берём из поля, которое показали сами.
+    var el = document.getElementById('phone-input');
+    return el ? normalizeKzPhone(el.value) : '';
   }
 
   function onSuccess(result) {
