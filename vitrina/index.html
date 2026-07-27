@@ -404,23 +404,12 @@ footer{
       </select>
       <div class="section-label full">3. Пожелания</div>
       <textarea id="fwishes" class="full" placeholder="Открытка, что передать, особые пожелания (необязательно)"></textarea>
-      <div class="section-label full">🍰 Добавить к букету?</div>
-      <div class="addons full" id="addonsWrap"></div>
       <div class="err full" id="formErr">Заполните обязательные поля</div>
       <button class="send full" id="sendBtn">Отправить заявку</button>
     </div>
   </div>
 </div>
 
-<style>
-.addons{display:flex;flex-direction:column;gap:6px;margin-top:2px;}
-.addon{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;cursor:pointer;font-size:14px;transition:border-color .15s,background .15s;}
-.addon.on{border-color:var(--sage-dark);background:rgba(120,150,110,.10);}
-.addon input{margin:0;flex:none;}
-.addon-emoji{font-size:18px;flex:none;}
-.addon-name{flex:1;}
-.addon-price{color:#8a8a8a;font-size:13px;white-space:nowrap;}
-</style>
 <script>
 const SUBMIT_URL = 'https://script.google.com/macros/s/AKfycbx0FYyE3hckyyyhzZPbf4X2gELlhLoGNj8YbRfJcjj1bTbKlKjo-n16cMUWN7SBnxDepw/exec';
 const KASPI_LINK = 'https://pay.kaspi.kz/pay/qlv5kzz7';
@@ -622,37 +611,6 @@ function buildTimeOptions(){
 }
 buildTimeOptions();
 
-// ─── Допродажа: десерты к букету. Правится тут — название / цена «от» / эмодзи ──
-const ADDONS = [
-  { name: 'Бенто-тортик',        price: 'от 2 000 ₸', emoji: '🍰' },
-  { name: 'Клубника в шоколаде', price: 'от 2 000 ₸', emoji: '🍓' },
-  { name: 'Капкейки',            price: 'от 1 700 ₸', emoji: '🧁' },
-  { name: 'Пончики',             price: 'от 3 500 ₸', emoji: '🍩' },
-];
-const addonsWrap = document.getElementById('addonsWrap');
-const selectedAddons = new Set();
-function renderAddons(){
-  addonsWrap.innerHTML = '';
-  ADDONS.forEach((a) => {
-    const lbl = document.createElement('label');
-    lbl.className = 'addon';
-    lbl.innerHTML = '<input type="checkbox"><span class="addon-emoji">' + a.emoji +
-      '</span><span class="addon-name">' + a.name + '</span><span class="addon-price">' + a.price + '</span>';
-    const cb = lbl.querySelector('input');
-    cb.addEventListener('change', () => {
-      lbl.classList.toggle('on', cb.checked);
-      if (cb.checked) selectedAddons.add(a.name); else selectedAddons.delete(a.name);
-    });
-    addonsWrap.appendChild(lbl);
-  });
-}
-renderAddons();
-function resetAddons(){
-  selectedAddons.clear();
-  addonsWrap.querySelectorAll('input').forEach((cb) => { cb.checked = false; });
-  addonsWrap.querySelectorAll('.addon').forEach((l) => l.classList.remove('on'));
-}
-
 function openModal(item, card){
   currentItem = item;
   currentCard = card;
@@ -675,7 +633,6 @@ function openModal(item, card){
   fwishes.value = '';
   formErr.style.display = 'none';
   resetCheckoutBonus();
-  resetAddons();
   modalOverlay.classList.add('open');
 }
 
@@ -779,8 +736,7 @@ document.getElementById('sendBtn').addEventListener('click', () => {
       address: isDelivery ? address : '',
       time:time, wishes:wishes,
       useBonusPoints: useBonusPoints,
-      bonusPointsBalance: useBonusPoints ? checkoutBonusPoints : 0,
-      addons: Array.from(selectedAddons)
+      bonusPointsBalance: useBonusPoints ? checkoutBonusPoints : 0
     })
   }).catch(()=>{});
 
