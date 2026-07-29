@@ -101,6 +101,18 @@ main{padding:28px 20px 10px;}
 .card .thanks{display:none;padding-top:6px;border-top:1px solid var(--line);margin-top:6px;font-size:13.5px;}
 .card.sent button.want{display:none;}
 .card.sent .thanks{display:flex;flex-direction:column;gap:8px;}
+.addons{padding:0 2px 2px;}
+.addons-title{font-family:'Playfair Display',Georgia,serif;font-size:16px;margin:0 0 10px;}
+.addons-strip{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.addons-strip::-webkit-scrollbar{display:none;}
+.addon-card{flex:0 0 118px;width:118px;border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;background:#fff;position:relative;transition:border-color .15s;}
+.addon-card.selected{border-color:var(--sage-dark);box-shadow:0 0 0 1px var(--sage-dark) inset;}
+.addon-photo{height:96px;background-size:cover;background-position:center;background-color:#f2efe9;}
+.addon-info{padding:7px 9px 9px;display:flex;flex-direction:column;gap:3px;}
+.addon-name{font-size:12.5px;line-height:1.25;}
+.addon-price{font-size:12.5px;font-weight:600;color:var(--sage-dark);}
+.addon-check{position:absolute;top:7px;right:7px;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.92);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;color:transparent;}
+.addon-card.selected .addon-check{background:var(--sage-dark);border-color:var(--sage-dark);color:#fff;}
 .thanks .kaspi-link{
   display:inline-block;
   text-align:center;
@@ -373,6 +385,10 @@ footer{
         <div class="modal-price" id="modalPrice"></div>
       </div>
     </div>
+    <div class="addons" id="addonsBlock">
+      <div class="addons-title">Люди добавляют к заказу</div>
+      <div class="addons-strip" id="addonsStrip"></div>
+    </div>
     <div class="modal-form">
       <div class="section-label full first">1. Контакты</div>
       <input type="text" id="fname" placeholder="Ваше имя">
@@ -611,6 +627,42 @@ function buildTimeOptions(){
 }
 buildTimeOptions();
 
+const ADDONS = [
+  {name:'Бенто-торт', price:3000, photo:'addons/bento.jpg'},
+  {name:'Шары-сердца, 5 шт', price:10000, photo:'addons/balloons5.jpg'},
+  {name:'Шары-сердца, 13 шт', price:26000, photo:'addons/balloons13.jpg'},
+  {name:'Мишка', price:12000, photo:'addons/bear.jpg'},
+  {name:'Акула', price:9000, photo:'addons/shark.jpg'},
+  {name:'Секатор', price:2500, photo:'addons/secateur.jpg'},
+];
+let selectedAddons = new Set();
+function renderAddons(){
+  const strip = document.getElementById('addonsStrip');
+  strip.innerHTML = '';
+  ADDONS.forEach((a, i) => {
+    const c = document.createElement('div');
+    c.className = 'addon-card';
+    c.innerHTML =
+      '<div class="addon-photo" style="background-image:url(\'' + a.photo + '\')"></div>' +
+      '<div class="addon-check">✓</div>' +
+      '<div class="addon-info"><div class="addon-name">' + a.name + '</div>' +
+      '<div class="addon-price">' + a.price.toLocaleString('ru-RU') + ' ₸</div></div>';
+    c.addEventListener('click', () => {
+      if (selectedAddons.has(i)){ selectedAddons.delete(i); c.classList.remove('selected'); }
+      else { selectedAddons.add(i); c.classList.add('selected'); }
+    });
+    strip.appendChild(c);
+  });
+}
+function resetAddons(){
+  selectedAddons = new Set();
+  document.querySelectorAll('.addon-card.selected').forEach(c => c.classList.remove('selected'));
+}
+function getSelectedAddons(){
+  return Array.from(selectedAddons).sort((x,y)=>x-y).map(i => ADDONS[i].name + ' — ' + ADDONS[i].price.toLocaleString('ru-RU') + '₸');
+}
+renderAddons();
+
 function openModal(item, card){
   currentItem = item;
   currentCard = card;
@@ -633,6 +685,7 @@ function openModal(item, card){
   fwishes.value = '';
   formErr.style.display = 'none';
   resetCheckoutBonus();
+  resetAddons();
   modalOverlay.classList.add('open');
 }
 
@@ -736,7 +789,8 @@ document.getElementById('sendBtn').addEventListener('click', () => {
       address: isDelivery ? address : '',
       time:time, wishes:wishes,
       useBonusPoints: useBonusPoints,
-      bonusPointsBalance: useBonusPoints ? checkoutBonusPoints : 0
+      bonusPointsBalance: useBonusPoints ? checkoutBonusPoints : 0,
+      addons: getSelectedAddons()
     })
   }).catch(()=>{});
 
