@@ -735,6 +735,42 @@
     return n < 10 ? '0' + n : String(n);
   }
 
+  // Подписи для сообщения об ошибке — те же слова, что человек видит на экране.
+  var FIELD_LABELS = {
+    own_birthday: 'Ваш день рождения', wife: 'Жена / Любимая', mom: 'Мама',
+    grandma: 'Бабушка', sister: 'Сестра', girlfriend: 'Подруга',
+    colleague: 'Коллега / Другое', custom_event: 'Особая дата'
+  };
+
+  // Ищет первое поле, где выбран ровно один селект из двух. Возвращает null, если таких нет.
+  function findHalfFilledDate() {
+    var prefixes = DATE_FIELDS.concat([CUSTOM_FIELD]);
+    for (var i = 0; i < prefixes.length; i++) {
+      var p = prefixes[i];
+      var daySel = document.getElementById(p + '_day');
+      var monSel = document.getElementById(p + '_month');
+      if (!daySel || !monSel) continue;
+      var day = daySel.value, mon = monSel.value;
+      if (!!day === !!mon) continue;                       // оба пустые или оба выбраны — норма
+      if (daySel.offsetParent === null) continue;          // скрытое поле старой структуры — не трогаем
+      return {
+        label: FIELD_LABELS[p] || p,
+        got: day ? 'день' : 'месяц',
+        focusEl: day ? monSel : daySel                     // фокус на то, чего не хватает
+      };
+    }
+    // Динамические строки: там та же половина даты, но название может быть пустым.
+    var rows = document.querySelectorAll('#extra-dates .extra-row');
+    for (var r = 0; r < rows.length; r++) {
+      var id = rows[r].id.replace('extra-row-', '');
+      var d = document.getElementById('extra_day_' + id), m = document.getElementById('extra_month_' + id);
+      if (!d || !m || !!d.value === !!m.value) continue;
+      var nm = (document.getElementById('extra_name_' + id) || {}).value || '';
+      return { label: nm.trim() || 'дополнительное событие', got: d.value ? 'день' : 'месяц', focusEl: d.value ? m : d };
+    }
+    return null;
+  }
+
   // ─── Разбор дат, написанных текстом ──────────────────────────────
   // Зачем: поле «Название события» одно, а поводов у человека бывает пять. Кто-то
   // вместо кнопки «Добавить событие» перечисляет всё в названии: «31.10, 09.12,
@@ -901,6 +937,18 @@
     DATE_FIELDS.forEach(function(f) { formData[f] = getDate(f); });
     formData.custom_event_name = document.getElementById('custom_event_name').value.trim();
     formData.custom_event_date = getDate('custom_event');
+
+    // Половина даты — тоже молчаливая потеря. getDate() отдаёт значение только когда выбраны
+    // ОБА селекта: выбрал «14», не поставил месяц — повод исчезает без единого слова, а анкета
+    // уходит как ни в чём не бывало (30.07.2026, разбор «почему у двоих повод без даты»:
+    // ровно этот класс — форма молча съедает заполненное наполовину). Проверяем ВСЕ поля.
+    var halfFilled = findHalfFilledDate();
+    if (halfFilled) {
+      showError('У «' + halfFilled.label + '» выбран только ' + halfFilled.got +
+        ' — укажите и день, и месяц, иначе мы не сможем напомнить.');
+      halfFilled.focusEl.focus();
+      return;
+    }
 
     // Основное «своё событие»: название заполнено, дата не выбрана. Раньше такая
     // анкета уходила молча — проверка стояла только на динамических строках ниже,
