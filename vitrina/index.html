@@ -355,6 +355,25 @@ footer{
   margin-left:5px;
   vertical-align:middle;
 }
+.modal-form .trust-block{
+  border:1px solid var(--line);
+  border-radius:3px;
+  padding:10px 12px;
+  margin-top:4px;
+  display:flex;
+  flex-direction:column;
+  gap:7px;
+}
+.modal-form .trust-item{
+  font-size:12.5px;
+  color:var(--ink);
+  line-height:1.35;
+  display:flex;
+  align-items:flex-start;
+  gap:7px;
+}
+.modal-form .trust-item b{color:var(--sage-dark);font-weight:600;}
+.modal-form .trust-ic{font-size:14px;line-height:1.2;flex:none;}
 
 .bonus-box{
   background:var(--cream);
@@ -455,6 +474,11 @@ footer{
       <div class="section-label full">3. Пожелания</div>
       <textarea id="fwishes" class="full" placeholder="Открытка, что передать, особые пожелания (необязательно)"></textarea>
       <div class="err full" id="formErr">Заполните обязательные поля</div>
+      <div class="trust-block full">
+        <div class="trust-item"><span class="trust-ic">🚚</span><span>Доставка по городу — <b>бесплатно, до 30 минут</b></span></div>
+        <div class="trust-item"><span class="trust-ic">🌷</span><span>Свежие цветы — заменим, если что-то не так</span></div>
+        <div class="trust-item"><span class="trust-ic">🎁</span><span>Возвращаем <b>3% баллами</b> с каждой покупки</span></div>
+      </div>
       <div class="order-total full" id="orderTotal" style="display:none"></div>
       <button class="send full" id="sendBtn">Отправить заявку</button>
     </div>
