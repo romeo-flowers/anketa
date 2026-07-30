@@ -57,6 +57,37 @@ header h1{
 header p{margin:0;font-size:14px;opacity:.9;}
 
 main{padding:28px 20px 10px;}
+.filter-bar{
+  position:sticky;
+  top:0;
+  z-index:20;
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  padding:10px 0;
+  background:var(--cream);
+  border-bottom:1px solid var(--line);
+  margin-bottom:14px;
+}
+.filter-chip{
+  border:1px solid var(--line);
+  background:#fff;
+  color:var(--ink);
+  font-family:inherit;
+  font-size:12.5px;
+  padding:6px 13px;
+  border-radius:16px;
+  cursor:pointer;
+  white-space:nowrap;
+  transition:background .12s,color .12s;
+}
+.filter-chip.active{
+  background:var(--sage-dark);
+  color:#fff;
+  border-color:var(--sage-dark);
+}
+.filter-chip .cnt{opacity:.55;font-size:11px;margin-left:3px;}
+.filter-chip.active .cnt{opacity:.85;}
 .grid{
   display:grid;
   grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
@@ -420,6 +451,7 @@ footer{
       <div class="loader-flowers"><span>🌸</span><span>🌸</span><span>🌸</span></div>
       <div class="loader-text">Загружаем витрину…</div>
     </div>
+    <div id="filterBar" class="filter-bar" style="display:none"></div>
     <div id="grid" class="grid"></div>
     <div id="empty" class="empty-state" style="display:none;">Витрина обновляется, загляните чуть позже 🌸</div>
   </main>
@@ -891,6 +923,8 @@ document.getElementById('sendBtn').addEventListener('click', () => {
 function renderCard(item, idx){
   const card = document.createElement('div');
   card.className = 'card';
+  const _price = Number(item.price);
+  card.dataset.price = isNaN(_price) ? '' : _price;
   card.innerHTML =
     '<div class="photo"' + (item.photo ? ' style="background-image:url(\'' + item.photo + '\')"' : '') + '>' +
       (item.photo ? '' : 'фото скоро') +
@@ -910,6 +944,38 @@ function renderCard(item, idx){
   return card;
 }
 
+function buildFilterBar(items){
+  const bar = document.getElementById('filterBar');
+  if (!bar) return;
+  const prices = items.map(it => Number(it.price)).filter(n => !isNaN(n) && n > 0);
+  const tiers = [
+    { key:'all', label:'Все',        test:() => true },
+    { key:'lo',  label:'до 15 000',  test:p => p > 0 && p < 15000 },
+    { key:'mid', label:'15–25 000',  test:p => p >= 15000 && p < 25000 },
+    { key:'hi',  label:'от 25 000',  test:p => p >= 25000 },
+  ];
+  bar.innerHTML = '';
+  tiers.forEach(t => {
+    const cnt = t.key === 'all' ? prices.length : prices.filter(t.test).length;
+    if (t.key !== 'all' && cnt === 0) return; // прячем пустой диапазон
+    const chip = document.createElement('button');
+    chip.className = 'filter-chip' + (t.key === 'all' ? ' active' : '');
+    chip.innerHTML = t.label + ' <span class="cnt">' + cnt + '</span>';
+    chip.addEventListener('click', () => {
+      bar.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      document.querySelectorAll('#grid .card').forEach(card => {
+        const p = Number(card.dataset.price);
+        const show = t.key === 'all' || (!isNaN(p) && t.test(p));
+        card.style.display = show ? '' : 'none';
+      });
+      if (window.scrollY > bar.offsetTop) window.scrollTo(0, bar.offsetTop);
+    });
+    bar.appendChild(chip);
+  });
+  bar.style.display = 'flex';
+}
+
 fetch(SUBMIT_URL, {
   method:'POST',
   headers:{'Content-Type':'text/plain'},
@@ -924,6 +990,7 @@ fetch(SUBMIT_URL, {
       return;
     }
     items.forEach((item, idx) => grid.appendChild(renderCard(item, idx)));
+    buildFilterBar(items);
   })
   .catch(() => {
     document.getElementById('loader').style.display = 'none';
