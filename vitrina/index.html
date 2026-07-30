@@ -88,6 +88,13 @@ main{padding:28px 20px 10px;}
 }
 .filter-chip .cnt{opacity:.55;font-size:11px;margin-left:3px;}
 .filter-chip.active .cnt{opacity:.85;}
+.premium-block{padding:2px 2px 4px;margin-bottom:18px;}
+.premium-head{margin:0 0 10px;}
+.premium-title{font-family:'Playfair Display',Georgia,serif;font-size:18px;line-height:1.2;}
+.premium-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+.premium-strip{display:flex;gap:14px;overflow-x:auto;padding-bottom:6px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.premium-strip::-webkit-scrollbar{display:none;}
+.premium-strip .card{flex:0 0 220px;width:220px;}
 .grid{
   display:grid;
   grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
@@ -447,6 +454,13 @@ footer{
   </header>
 
   <main>
+    <div class="premium-block" id="premiumBlock">
+      <div class="premium-head">
+        <div class="premium-title">⭐ Хиты и премиум</div>
+        <div class="premium-sub">Соберём в любой момент — даже если нет на витрине</div>
+      </div>
+      <div class="premium-strip" id="premiumStrip"></div>
+    </div>
     <div id="loader" class="loader">
       <div class="loader-flowers"><span>🌸</span><span>🌸</span><span>🌸</span></div>
       <div class="loader-text">Загружаем витрину…</div>
@@ -975,6 +989,21 @@ function buildFilterBar(items){
   });
   bar.style.display = 'flex';
 }
+
+const PREMIUM = [
+  { name: 'Воздушные хризантемы',       price: 62000, photo: 'premium/hrizantemy.jpg' },
+  { name: 'Премиум корзина',            price: 57000, photo: 'premium/korzina.jpg' },
+  { name: 'Французские розы в кашпо',   price: 43500, photo: 'premium/french-roses.jpg' },
+  { name: 'Гортензии в сумочке',        price: 39500, photo: 'premium/gortenzii.jpg' },
+  { name: 'Розовая сумочка',            price: 27500, photo: 'premium/sumochka-pink.jpg' },
+];
+function renderPremium(){
+  const strip = document.getElementById('premiumStrip');
+  if (!strip) return;
+  strip.innerHTML = '';
+  PREMIUM.forEach((item, i) => strip.appendChild(renderCard(item, 'p' + i)));
+}
+renderPremium();
 
 const VITRINA_MAX_TRIES = 4;
 function showVitrinaEmpty(){
