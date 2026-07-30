@@ -322,6 +322,27 @@ footer{
   margin-top:4px;
 }
 .modal-form .send:hover{background:var(--sage);}
+.modal-form .order-total{
+  background:var(--cream);
+  border-radius:3px;
+  padding:10px 12px;
+  text-align:center;
+  margin-top:2px;
+}
+.modal-form .order-total .ot-break{
+  font-size:11.5px;
+  color:var(--muted);
+  margin-bottom:3px;
+}
+.modal-form .order-total .ot-sum{
+  font-size:14.5px;
+  color:var(--ink);
+  font-weight:600;
+}
+.modal-form .order-total .ot-sum b{
+  color:var(--sage-dark);
+  font-weight:700;
+}
 
 .bonus-box{
   background:var(--cream);
@@ -422,6 +443,7 @@ footer{
       <div class="section-label full">3. Пожелания</div>
       <textarea id="fwishes" class="full" placeholder="Открытка, что передать, особые пожелания (необязательно)"></textarea>
       <div class="err full" id="formErr">Заполните обязательные поля</div>
+      <div class="order-total full" id="orderTotal" style="display:none"></div>
       <button class="send full" id="sendBtn">Отправить заявку</button>
     </div>
   </div>
@@ -651,6 +673,7 @@ function renderAddons(){
     c.addEventListener('click', () => {
       if (selectedAddons.has(i)){ selectedAddons.delete(i); c.classList.remove('selected'); }
       else { selectedAddons.add(i); c.classList.add('selected'); }
+      updateTotal();
     });
     strip.appendChild(c);
   });
@@ -661,6 +684,27 @@ function resetAddons(){
 }
 function getSelectedAddons(){
   return Array.from(selectedAddons).sort((x,y)=>x-y).map(i => ADDONS[i].name + ' — ' + ADDONS[i].price.toLocaleString('ru-RU') + '₸');
+}
+function updateTotal(){
+  const el = document.getElementById('orderTotal');
+  if (!el || !currentItem) return;
+  const base = Number(currentItem.price);
+  const addonSum = Array.from(selectedAddons).reduce((s,i) => s + Number(ADDONS[i].price || 0), 0);
+  if (isNaN(base)){
+    if (addonSum > 0){
+      el.innerHTML = '<div class="ot-sum">Допы: <b>' + addonSum.toLocaleString('ru-RU') + ' ₸</b> + цена букета</div>';
+      el.style.display = '';
+    } else { el.style.display = 'none'; }
+    return;
+  }
+  const total = base + addonSum;
+  let html = '';
+  if (addonSum > 0){
+    html += '<div class="ot-break">Букет ' + base.toLocaleString('ru-RU') + ' ₸ + допы ' + addonSum.toLocaleString('ru-RU') + ' ₸</div>';
+  }
+  html += '<div class="ot-sum">Примерно к оплате: <b>' + total.toLocaleString('ru-RU') + ' ₸</b></div>';
+  el.innerHTML = html;
+  el.style.display = '';
 }
 renderAddons();
 
@@ -687,6 +731,7 @@ function openModal(item, card){
   formErr.style.display = 'none';
   resetCheckoutBonus();
   resetAddons();
+  updateTotal();
   modalOverlay.classList.add('open');
 }
 
