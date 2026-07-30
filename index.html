@@ -670,6 +670,38 @@
 
   function onSelectChange(sel) {
     sel.classList.toggle('empty', !sel.value);
+    if (sel.id.indexOf('_month') > -1) syncDaysForMonth(sel);
+  }
+
+  // Год во всей анкете — 2000 (високосный), поэтому 29 февраля допустимо.
+  var DAYS_IN_MONTH_UI = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+  // Список дней подстраивается под выбранный месяц. Без этого можно выбрать 31 апреля,
+  // и дата не пропадала, а ТИХО СЪЕЗЖАЛА: new Date('2000-04-31') в JS не ошибка, а 1 мая —
+  // клиент указал одно, напоминание ушло бы на другой день, и никто бы не заметил
+  // (найдено 30.07.2026 при разборе «как сделать, чтобы это не повторялось вообще»).
+  function syncDaysForMonth(monthSel) {
+    var daySel = document.getElementById(monthSel.id.replace('_month', '_day'));
+    if (!daySel) return;
+
+    var max = monthSel.value ? DAYS_IN_MONTH_UI[parseInt(monthSel.value, 10) - 1] : 31;
+    var prev = daySel.value;
+    var current = daySel.options.length - 1;          // минус пункт «День»
+
+    if (current > max) {
+      for (var i = current; i > max; i--) daySel.remove(i);
+    } else if (current < max) {
+      for (var d = current + 1; d <= max; d++) addOption(daySel, pad(d), String(d));
+    }
+
+    if (prev && parseInt(prev, 10) > max) {
+      // Выбрали 31-е, потом сменили месяц на короткий — молча обнулять нельзя, скажем прямо.
+      daySel.value = '';
+      onSelectChange(daySel);
+      showError('В этом месяце ' + max + ' ' + (max === 31 ? 'день' : 'дней') + ' — выберите день заново.');
+    } else {
+      daySel.value = prev;
+    }
   }
 
   var extraRowCount = 0;
