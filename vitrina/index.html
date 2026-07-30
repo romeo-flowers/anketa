@@ -976,26 +976,38 @@ function buildFilterBar(items){
   bar.style.display = 'flex';
 }
 
-fetch(SUBMIT_URL, {
-  method:'POST',
-  headers:{'Content-Type':'text/plain'},
-  body: JSON.stringify({ type:'vitrina_list' })
-})
-  .then(r => r.json())
-  .then(items => {
-    document.getElementById('loader').style.display = 'none';
-    const grid = document.getElementById('grid');
-    if (!items || !items.length){
-      document.getElementById('empty').style.display = 'block';
-      return;
-    }
-    items.forEach((item, idx) => grid.appendChild(renderCard(item, idx)));
-    buildFilterBar(items);
+const VITRINA_MAX_TRIES = 4;
+function showVitrinaEmpty(){
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('empty').style.display = 'block';
+}
+function loadVitrina(attempt){
+  attempt = attempt || 1;
+  fetch(SUBMIT_URL, {
+    method:'POST',
+    headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ type:'vitrina_list' })
   })
-  .catch(() => {
-    document.getElementById('loader').style.display = 'none';
-    document.getElementById('empty').style.display = 'block';
-  });
+    .then(r => r.json())
+    .then(items => {
+      if (!items || !items.length){
+        // холодный старт GAS иногда отдаёт пусто — повторяем, лоадер держим
+        if (attempt < VITRINA_MAX_TRIES){ setTimeout(() => loadVitrina(attempt + 1), 1200); return; }
+        showVitrinaEmpty();
+        return;
+      }
+      document.getElementById('loader').style.display = 'none';
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+      items.forEach((item, idx) => grid.appendChild(renderCard(item, idx)));
+      buildFilterBar(items);
+    })
+    .catch(() => {
+      if (attempt < VITRINA_MAX_TRIES){ setTimeout(() => loadVitrina(attempt + 1), 1200); return; }
+      showVitrinaEmpty();
+    });
+}
+loadVitrina();
 </script>
 
 </body>
