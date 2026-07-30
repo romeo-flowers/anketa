@@ -405,6 +405,7 @@ footer{
       <div class="recipient-fields" id="recipientFields">
         <input type="text" id="frname" placeholder="Имя получателя">
         <input type="tel" id="frphone" placeholder="Телефон получателя">
+        <div class="field-hint full">Курьер позвонит получателю согласовать время доставки</div>
       </div>
       <div class="section-label full">2. Доставка</div>
       <div class="delivery-choice full">
@@ -699,7 +700,15 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modalOve
 
 fsame.addEventListener('change', () => recipientFields.classList.toggle('show', !fsame.checked));
 
-function toggleAddress(){ addressField.style.display = fdelivery.checked ? 'block' : 'none'; }
+function toggleAddress(){
+  const isDelivery = fdelivery.checked;
+  addressField.style.display = isDelivery ? 'block' : 'none';
+  // Доставка обычно = подарок другому: по умолчанию просим получателя (снимаем галку →
+  // поля получателя показываются, телефон становится обязательным по валидации). Самовывоз =
+  // ты сам получатель, галку ставим. Клиент может переключить вручную (себе / сюрприз).
+  fsame.checked = !isDelivery;
+  recipientFields.classList.toggle('show', !fsame.checked);
+}
 fpickup.addEventListener('change', toggleAddress);
 fdelivery.addEventListener('change', toggleAddress);
 
