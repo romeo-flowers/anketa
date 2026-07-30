@@ -343,6 +343,18 @@ footer{
   color:var(--sage-dark);
   font-weight:700;
 }
+.free-badge{
+  display:inline-block;
+  background:var(--sage-dark);
+  color:#fff;
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:.03em;
+  padding:1px 7px;
+  border-radius:9px;
+  margin-left:5px;
+  vertical-align:middle;
+}
 
 .bonus-box{
   background:var(--cream);
@@ -431,7 +443,7 @@ footer{
       <div class="section-label full">2. Доставка</div>
       <div class="delivery-choice full">
         <label><input type="radio" name="delivery" id="fpickup" checked> Самовывоз</label>
-        <label><input type="radio" name="delivery" id="fdelivery"> Доставка</label>
+        <label><input type="radio" name="delivery" id="fdelivery"> Доставка <span class="free-badge">бесплатно</span></label>
       </div>
       <div class="full address-field" id="addressField" style="display:none">
         <input type="text" id="faddress" placeholder="Адрес доставки (улица, дом)" autocomplete="off">
@@ -702,7 +714,7 @@ function updateTotal(){
   if (addonSum > 0){
     html += '<div class="ot-break">Букет ' + base.toLocaleString('ru-RU') + ' ₸ + допы ' + addonSum.toLocaleString('ru-RU') + ' ₸</div>';
   }
-  html += '<div class="ot-sum">Примерно к оплате: <b>' + total.toLocaleString('ru-RU') + ' ₸</b></div>';
+  html += '<div class="ot-sum">К оплате: <b>' + total.toLocaleString('ru-RU') + ' ₸</b></div>';
   el.innerHTML = html;
   el.style.display = '';
 }
