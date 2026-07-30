@@ -276,6 +276,45 @@
       line-height: 1.6;
     }
 
+    /* ─── Hint (предложение разнести даты) ─── */
+    .hint-msg {
+      display: none;
+      background: #f4f6f2;
+      border: 1px solid #c3d0c3;
+      border-radius: 3px;
+      padding: 11px 13px;
+      font-size: 12.5px;
+      color: #4a5a45;
+      margin-top: 14px;
+      line-height: 1.6;
+    }
+    .hint-msg .hint-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 9px;
+      flex-wrap: wrap;
+    }
+    .hint-msg button {
+      background: #8ca28c;
+      color: #f4f2ee;
+      border: none;
+      border-radius: 3px;
+      padding: 8px 14px;
+      font-size: 11.5px;
+      font-family: 'Circe', sans-serif;
+      font-weight: 500;
+      letter-spacing: 0.4px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .hint-msg button:hover { background: #758c75; }
+    .hint-msg button.secondary {
+      background: none;
+      border: 1px solid #c3d0c3;
+      color: #6a7a65;
+    }
+    .hint-msg button.secondary:hover { background: #eceee8; }
+
     /* ─── Submit button ─── */
     .submit-btn {
       width: 100%;
@@ -464,6 +503,7 @@
         <select id="colleague_month"></select>
       </div>
 
+      <div id="hint-msg" class="hint-msg"></div>
       <div id="error-msg" class="error-msg"></div>
 
       <button type="button" class="submit-btn" id="submit-btn" onclick="handleSubmit()">
@@ -695,10 +735,147 @@
     return n < 10 ? '0' + n : String(n);
   }
 
+  // ─── Разбор дат, написанных текстом ──────────────────────────────
+  // Зачем: поле «Название события» одно, а поводов у человека бывает пять. Кто-то
+  // вместо кнопки «Добавить событие» перечисляет всё в названии: «31.10, 09.12,
+  // 20.01 дни рождения близких» или «5 июля». Дата при этом не выбрана, напомнить
+  // не о чем — повод терялся молча (найдено 30.07.2026 на реальной анкете).
+  // Теперь такие даты вылавливаем и предлагаем разнести по отдельным событиям.
+
+  var MONTHS_GENITIVE = [
+    'января','февраля','марта','апреля','мая','июня',
+    'июля','августа','сентября','октября','ноября','декабря'
+  ];
+  // Корни месяцев для «5 июля» / «31 октября» / «1 мая». Порядок важен: март (мар)
+  // проверяется раньше мая (ма), иначе «марта» схлопнется в май.
+  var MONTH_ROOTS = [
+    ['01','янв'], ['02','фев'], ['03','мар'], ['04','апр'], ['05','ма'],  ['06','июн'],
+    ['07','июл'], ['08','авг'], ['09','сен'], ['10','окт'], ['11','ноя'], ['12','дек']
+  ];
+  var DAYS_IN_MONTH = [31,29,31,30,31,30,31,31,30,31,30,31]; // 29.02 допустима — год храним как 2000
+
+  function parseDatesFromText(text) {
+    var found = [], seen = {};
+
+    function push(d, m) {
+      d = parseInt(d, 10); m = parseInt(m, 10);
+      if (!d || !m || m > 12 || d > DAYS_IN_MONTH[m - 1]) return;
+      var key = pad(m) + '-' + pad(d);
+      if (seen[key]) return;                  // «31.10» и «31 октября» в одном тексте = одна дата
+      seen[key] = true;
+      found.push({ day: pad(d), month: pad(m) });
+    }
+
+    // 31.10 · 31.10.2025 · 31/10 · 31-10
+    var re = /(\d{1,2})\s*[./-]\s*(\d{1,2})(?:\s*[./-]\s*\d{2,4})?/g, m;
+    while ((m = re.exec(text)) !== null) push(m[1], m[2]);
+
+    // 5 июля · 31 октября
+    var lower = text.toLowerCase().replace(/ё/g, 'е');
+    var reWord = /(\d{1,2})\s+([а-я]{3,})/g;
+    while ((m = reWord.exec(lower)) !== null) {
+      for (var i = 0; i < MONTH_ROOTS.length; i++) {
+        if (m[2].indexOf(MONTH_ROOTS[i][1]) === 0) { push(m[1], MONTH_ROOTS[i][0]); break; }
+      }
+    }
+    return found;
+  }
+
+  function humanDate(d) {
+    return parseInt(d.day, 10) + ' ' + MONTHS_GENITIVE[parseInt(d.month, 10) - 1];
+  }
+
+  // Название без самих дат: «31.10, 09.12 дни рождения близких» → «дни рождения близких».
+  // Пусто — не страшно, бэкенд подставит «важной даты».
+  function stripDates(text) {
+    return text
+      .replace(/(\d{1,2})\s*[./-]\s*(\d{1,2})(?:\s*[./-]\s*\d{2,4})?/g, ' ')
+      .replace(/(\d{1,2})\s+([а-яё]{3,})/gi, function (whole, day, word) {
+        var w = word.toLowerCase().replace(/ё/g, 'е');
+        for (var i = 0; i < MONTH_ROOTS.length; i++) {
+          if (w.indexOf(MONTH_ROOTS[i][1]) === 0) return ' ';
+        }
+        return whole;
+      })
+      .replace(/[,;·]+/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+      .slice(0, 60)
+      // «31 октября и 1 мая» → после вырезания дат остаётся «и». Такой огрызок уедет
+      // в WhatsApp-шаблон как «напоминаем о и» — лучше пусто, бэкенд скажет «важной даты».
+      .replace(/^(и|а|но|да|или|-|—)$/i, '');
+  }
+
+  function plural(n, one, few, many) {
+    var n10 = n % 10, n100 = n % 100;
+    if (n10 === 1 && n100 !== 11) return one;
+    if (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) return few;
+    return many;
+  }
+
+  // Создаёт готовые строки доп. событий с проставленными датами.
+  function spreadDates(dates, baseName) {
+    dates.forEach(function (d) {
+      addExtraRow();
+      var idx = extraRowCount;
+      document.getElementById('extra_name_' + idx).value = baseName;
+      var daySel = document.getElementById('extra_day_' + idx);
+      var monSel = document.getElementById('extra_month_' + idx);
+      daySel.value = d.day;
+      monSel.value = d.month;
+      onSelectChange(daySel);
+      onSelectChange(monSel);
+    });
+  }
+
+  function showHint(dates, sourceText) {
+    var el = document.getElementById('hint-msg');
+    el.innerHTML = '';
+
+    var text = document.createElement('div');
+    text.textContent = 'Нашли ' + dates.length + ' ' + plural(dates.length, 'дату', 'даты', 'дат') +
+      ' в названии события: ' + dates.map(humanDate).join(', ') +
+      '. Разнести по отдельным событиям? Тогда напомним о каждом.';
+    el.appendChild(text);
+
+    var actions = document.createElement('div');
+    actions.className = 'hint-actions';
+
+    var yes = document.createElement('button');
+    yes.type = 'button';
+    yes.textContent = 'Разнести';
+    yes.onclick = function () {
+      spreadDates(dates, stripDates(sourceText));
+      document.getElementById('custom_event_name').value = '';
+      hideHint();
+      handleSubmit();                          // всё заполнено — сразу отправляем
+    };
+
+    var no = document.createElement('button');
+    no.type = 'button';
+    no.className = 'secondary';
+    no.textContent = 'Выберу сам';
+    no.onclick = function () {
+      hideHint();
+      document.getElementById('custom_event_day').focus();
+    };
+
+    actions.appendChild(yes);
+    actions.appendChild(no);
+    el.appendChild(actions);
+    el.style.display = 'block';
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function hideHint() {
+    document.getElementById('hint-msg').style.display = 'none';
+  }
+
   // ─── Отправка ────────────────────────────────────────────────────
 
   function handleSubmit() {
     hideError();
+    hideHint();
 
     var phone = getPhone();
     var name  = document.getElementById('name').value.trim();
@@ -724,6 +901,21 @@
     DATE_FIELDS.forEach(function(f) { formData[f] = getDate(f); });
     formData.custom_event_name = document.getElementById('custom_event_name').value.trim();
     formData.custom_event_date = getDate('custom_event');
+
+    // Основное «своё событие»: название заполнено, дата не выбрана. Раньше такая
+    // анкета уходила молча — проверка стояла только на динамических строках ниже,
+    // и повод пропадал без следа (найдено 30.07.2026: четверо клиентов, у одного
+    // шесть дат текстом в названии). Сначала пробуем вычитать даты из самого текста
+    // и предложить разнести, и только если там дат нет — просим выбрать.
+    if (formData.custom_event_name && !formData.custom_event_date) {
+      var parsed = parseDatesFromText(formData.custom_event_name);
+      if (parsed.length) {
+        showHint(parsed, formData.custom_event_name);
+        return;
+      }
+      showError('Выберите дату для события «' + formData.custom_event_name + '» — без неё мы не сможем напомнить.');
+      return;
+    }
 
     // Собираем динамически добавленные события.
     // Было `if (name || (day && mon))` — по ИЛИ, поэтому сохранялось и наполовину
