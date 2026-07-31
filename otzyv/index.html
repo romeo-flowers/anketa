@@ -186,10 +186,22 @@
   document.getElementById('greeting').textContent = defGreeting();
 
   var rating = 0, sent = false;
+
+  // Оценку сохраняем СРАЗУ по нажатию звезды, не дожидаясь кнопок на втором экране
+  // (31.07.2026). Раньше уходило только по «Отправить» / «Оставить отзыв в 2ГИС», а экран
+  // уже говорил «Спасибо! 🌹» — кто ставил звезду и закрывал вкладку, исчезал из статистики
+  // совсем. Перекос был виден в данных: обе негативные записи с комментарием, а молчаливое
+  // недовольство не доезжало вовсе. Кнопки ниже шлют ту же пару (телефон, заказ) повторно —
+  // сервер обновляет ту же строку, а не плодит вторую.
+  function postRating(){
+    post({ type:'nps', rating:rating, phone:getPhone(), comment:'', name:CNAME, order:CORDER });
+  }
+
   document.getElementById('stars').addEventListener('click', function(e){
     var t = e.target.closest('.star'); if(!t) return;
     rating = +t.getAttribute('data-v');
     document.querySelectorAll('.star').forEach(function(s){ s.classList.toggle('on', +s.getAttribute('data-v') <= rating); });
+    postRating();
     setTimeout(function(){
       setHeader('Спасибо! 🌹', '');
       if(rating <= 3){ show('neg'); }
