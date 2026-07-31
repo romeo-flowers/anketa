@@ -571,12 +571,29 @@
     .catch(function() { /* тихо остаёмся на дефолтах выше */ });
   }
 
+  // Шаги воронки (31.07.2026). Знали только края: ссылок отправлено ~500, анкет заполнено
+  // ~85. Что между — открыли и закрыли? не открыли вовсе? споткнулись о проверку? — данных
+  // не было никаких. Шлём через sendBeacon: не блокирует страницу и переживает её закрытие.
+  // Аналитика молчаливая: любая ошибка здесь не должна мешать человеку заполнять анкету.
+  function track(event, detail) {
+    try {
+      var body = JSON.stringify({
+        type: 'anketa_event', event: event,
+        phone: (typeof getPhone === 'function' ? getPhone() : '') || '',
+        detail: detail || ''
+      });
+      if (navigator.sendBeacon && navigator.sendBeacon(SUBMIT_URL, new Blob([body], { type: 'text/plain;charset=utf-8' }))) return;
+      fetch(SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: body, keepalive: true });
+    } catch (e) { /* аналитика не важнее анкеты */ }
+  }
+
   function init() {
     populateSelects();
     setGreeting();
     prefillName();
     maybeAskPhone();
     loadConfig();
+    track('open');
   }
 
   // Телефон приходит в ссылке из WhatsApp (?phone=). Но ссылку на анкету вешаем и в сторис,
@@ -1031,6 +1048,7 @@
     }
 
     setLoading(true);
+    track('submit');   // дошёл до отправки — все проверки пройдены
 
     fetch(SUBMIT_URL, {
       method: 'POST',
@@ -1038,8 +1056,8 @@
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }
     })
     .then(function(r) { return r.json(); })
-    .then(onSuccess)
-    .catch(function(err) { onError(err); });
+    .then(function(res) { track('success'); onSuccess(res); })
+    .catch(function(err) { track('fail', String(err && err.message || err)); onError(err); });
   }
 
   function getPhone() {
@@ -1091,6 +1109,7 @@
     el.textContent    = msg;
     el.style.display  = 'block';
     el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    track('error', msg);   // на чём именно спотыкаются — самое ценное в воронке
   }
 
   function hideError() {
