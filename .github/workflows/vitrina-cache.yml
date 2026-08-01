@@ -25,24 +25,34 @@ jobs:
       - name: Забрать каталог из Apps Script
         run: |
           python3 - <<'PY'
-          import json, sys, urllib.request
+          import json, sys, time, urllib.request
 
           URL = ("https://script.google.com/macros/s/"
                  "AKfycbx0FYyE3hckyyyhzZPbf4X2gELlhLoGNj8YbRfJcjj1bTbKlKjo-n16cMUWN7SBnxDepw/exec")
 
-          req = urllib.request.Request(
-              URL, data=json.dumps({"type": "vitrina_list"}).encode(),
-              headers={"Content-Type": "text/plain"}, method="POST")
-          try:
-              with urllib.request.urlopen(req, timeout=120) as r:
-                  items = json.loads(r.read().decode())
-          except Exception as e:
-              print("Apps Script не ответил:", e)
-              sys.exit(0)          # молча выходим — старый data.json остаётся рабочим
+          # Три попытки: холодный старт Apps Script иногда отдаёт пусто или отваливается
+          # (та же причина, по которой в самой витрине стоит ретрай). Если не вышло ни разу —
+          # job ПАДАЕТ намеренно: GitHub пришлёт письмо, иначе каталог замрёт незаметно.
+          items = None
+          for attempt in range(1, 4):
+              try:
+                  req = urllib.request.Request(
+                      URL, data=json.dumps({"type": "vitrina_list"}).encode(),
+                      headers={"Content-Type": "text/plain"}, method="POST")
+                  with urllib.request.urlopen(req, timeout=120) as r:
+                      got = json.loads(r.read().decode())
+                  if isinstance(got, list) and got:
+                      items = got
+                      break
+                  print(f"попытка {attempt}: пустой ответ")
+              except Exception as e:
+                  print(f"попытка {attempt}: {e}")
+              time.sleep(5)
 
-          if not isinstance(items, list) or not items:
-              print("пустой ответ — файл не трогаем")
-              sys.exit(0)
+          if not items:
+              print("Apps Script не отдал каталог с трёх попыток.")
+              print("Витрина продолжает работать на прежнем data.json, но он устаревает.")
+              sys.exit(1)          # падаем осознанно — чтобы пришло уведомление
 
           with open("vitrina/data.json", "w", encoding="utf-8") as f:
               json.dump(items, f, ensure_ascii=False, separators=(",", ":"))
