@@ -1,0 +1,62 @@
+name: Кеш витрины
+
+# Витрина тянула каталог напрямую из Apps Script — он отвечает 3.7-4.4 сек, и всё это
+# время клиент смотрел на лоадер. Здесь каталог раз в 10 минут складывается в статический
+# vitrina/data.json: страница берёт его с GitHub Pages (CDN, ~50 мс) и рисуется сразу.
+# Свежесть не страдает: у самого Apps Script кеш каталога и так 600 сек.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:        # можно дёрнуть руками из вкладки Actions
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vitrina-cache
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Забрать каталог из Apps Script
+        run: |
+          python3 - <<'PY'
+          import json, sys, urllib.request
+
+          URL = ("https://script.google.com/macros/s/"
+                 "AKfycbx0FYyE3hckyyyhzZPbf4X2gELlhLoGNj8YbRfJcjj1bTbKlKjo-n16cMUWN7SBnxDepw/exec")
+
+          req = urllib.request.Request(
+              URL, data=json.dumps({"type": "vitrina_list"}).encode(),
+              headers={"Content-Type": "text/plain"}, method="POST")
+          try:
+              with urllib.request.urlopen(req, timeout=120) as r:
+                  items = json.loads(r.read().decode())
+          except Exception as e:
+              print("Apps Script не ответил:", e)
+              sys.exit(0)          # молча выходим — старый data.json остаётся рабочим
+
+          if not isinstance(items, list) or not items:
+              print("пустой ответ — файл не трогаем")
+              sys.exit(0)
+
+          with open("vitrina/data.json", "w", encoding="utf-8") as f:
+              json.dump(items, f, ensure_ascii=False, separators=(",", ":"))
+          print(f"записано букетов: {len(items)}")
+          PY
+
+      - name: Закоммитить, если изменилось
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- vitrina/data.json; then
+            echo "каталог не изменился"
+          else
+            git add vitrina/data.json
+            git commit -m "chore(vitrina): обновлён кеш каталога"
+            git push
+          fi
