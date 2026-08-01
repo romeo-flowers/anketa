@@ -1038,14 +1038,31 @@ function renderVitrina(items){
 // обновляет GitHub Action из того же Apps Script. Прямой запрос к Apps Script оставлен
 // запасным путём: он отвечает 3.7-4.4 сек, и всё это время клиент смотрел на лоадер
 // (замер 01.08.2026). Свежесть не страдает — у Apps Script кеш каталога и так 600 сек.
+// Если обновление каталога встанет (GitHub умеет отключать расписания в неактивных
+// репозиториях), статика тихо застынет и клиент увидит вчерашние букеты без единого
+// сигнала. Поэтому смотрим возраст файла по Last-Modified: свежий — рисуем мгновенно,
+// протухший — идём за живыми данными в Apps Script. Тогда худший сценарий деградирует
+// до того, как было раньше (лишние секунды ожидания), а не до неверного каталога.
+const DATA_MAX_AGE_H = 6;
 function loadVitrinaFast(){
   fetch('data.json?t=' + Math.floor(Date.now() / 600000), {cache: 'default'})
-    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(r => {
+      if (!r.ok) return Promise.reject();
+      const lm = r.headers.get('last-modified');
+      if (lm) {
+        const ageH = (Date.now() - new Date(lm).getTime()) / 3600000;
+        if (ageH > DATA_MAX_AGE_H) {
+          console.warn('Кеш каталога протух (' + ageH.toFixed(1) + ' ч) — беру живой');
+          return Promise.reject();
+        }
+      }
+      return r.json();
+    })
     .then(items => {
       if (!Array.isArray(items) || !items.length) return Promise.reject();
       renderVitrina(items);
     })
-    .catch(() => loadVitrina());   // статики нет или битая — идём в Apps Script
+    .catch(() => loadVitrina());   // статики нет, битая или протухла — идём в Apps Script
 }
 
 function loadVitrina(attempt){
