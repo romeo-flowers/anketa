@@ -590,6 +590,8 @@ const addressSuggest = document.getElementById('addressSuggest');
 const ftime = document.getElementById('ftime');
 const fwishes = document.getElementById('fwishes');
 const formErr = document.getElementById('formErr');
+const sendBtn = document.getElementById('sendBtn');
+const FORM_ERR_DEFAULT = formErr.textContent;
 
 attachPhoneMask(fphone);
 attachPhoneMask(frphone);
@@ -812,6 +814,9 @@ function openModal(item, card){
   ftime.value = '';
   fwishes.value = '';
   formErr.style.display = 'none';
+  formErr.textContent = FORM_ERR_DEFAULT;   // могло остаться «букет забрали» от прошлого открытия
+  sendBtn.disabled = false;
+  sendBtn.style.opacity = '';
   resetCheckoutBonus();
   resetAddons();
   updateTotal();
@@ -820,6 +825,7 @@ function openModal(item, card){
 
 function closeModal(){
   modalOverlay.classList.remove('open');
+  applyPendingCatalog();   // каталог мог обновиться, пока была открыта форма
 }
 
 document.getElementById('modalClose').addEventListener('click', closeModal);
@@ -1025,6 +1031,14 @@ function showVitrinaEmpty(){
   document.getElementById('empty').style.display = 'block';
   showPremium();
 }
+// Отпечаток нарисованного каталога: по нему видно, разошлась ли статика с живым Posiflora,
+// и надо ли вообще трогать DOM. Имени с ценой достаточно — фото у позиции не меняется.
+let shownCatalogKey = null;
+let pendingCatalog = null;   // живой каталог приехал, пока открыта форма заказа
+function catalogKey(items){
+  return JSON.stringify((items || []).map(i => [i.name, i.price]));
+}
+
 function renderVitrina(items){
   document.getElementById('loader').style.display = 'none';
   const grid = document.getElementById('grid');
@@ -1032,17 +1046,25 @@ function renderVitrina(items){
   items.forEach((item, idx) => grid.appendChild(renderCard(item, idx)));
   buildFilterBar(items);
   showPremium();   // премиум и каталог появляются вместе, страница не прыгает
+  shownCatalogKey = catalogKey(items);
 }
 
-// Каталог сначала берём статикой с GitHub Pages (CDN, ~50 мс) — его раз в 10 минут
-// обновляет GitHub Action из того же Apps Script. Прямой запрос к Apps Script оставлен
-// запасным путём: он отвечает 3.7-4.4 сек, и всё это время клиент смотрел на лоадер
-// (замер 01.08.2026). Свежесть не страдает — у Apps Script кеш каталога и так 600 сек.
-// Если обновление каталога встанет (GitHub умеет отключать расписания в неактивных
-// репозиториях), статика тихо застынет и клиент увидит вчерашние букеты без единого
-// сигнала. Поэтому смотрим возраст файла по Last-Modified: свежий — рисуем мгновенно,
-// протухший — идём за живыми данными в Apps Script. Тогда худший сценарий деградирует
-// до того, как было раньше (лишние секунды ожидания), а не до неверного каталога.
+// Каталог сначала берём статикой с GitHub Pages (CDN, ~50 мс) — её обновляет GitHub Action
+// из того же Apps Script. Прямой запрос к Apps Script оставлен запасным путём: он отвечает
+// 3.3-4.7 сек, и всё это время клиент смотрел на лоадер (замеры 01.08 и 04.08.2026).
+//
+// 04.08.2026: расписание у Action заявлено раз в 10 минут, а GitHub запускает его раз в
+// 1-3.5 часа — cron у Actions best-effort, короткие интервалы дропаются под нагрузкой.
+// Прогоны при этом НЕ падают, каталог замерзает молча. В момент проверки на сайте висело
+// 25 букетов против 15 живых в Posiflora: 13 проданных предлагались как доступные, три
+// новых не показывались вовсе. Порог в 6 часов такое не ловил — файлу было полтора часа.
+//
+// Порог по возрасту оставлен как аварийный (совсем древнюю статику не рисуем вообще), но
+// чинит не он: полтора часа его проходят, а каталог за это время уже другой. Чинит то, что
+// статика ТЕПЕРЬ ВСЕГДА перепроверяется живым запросом после отрисовки — карточки
+// появляются через ~50 мс, правда доезжает через ~4 сек и молча заменяет собой кеш.
+// Скорость не пострадала, срок жизни вранья упал с часов до секунд, и это не зависит от
+// того, когда GitHub соизволит запустить свой cron.
 const DATA_MAX_AGE_H = 6;
 function loadVitrinaFast(){
   fetch('data.json?t=' + Math.floor(Date.now() / 600000), {cache: 'default'})
@@ -1061,8 +1083,50 @@ function loadVitrinaFast(){
     .then(items => {
       if (!Array.isArray(items) || !items.length) return Promise.reject();
       renderVitrina(items);
+      revalidateVitrina();   // статика могла устареть и внутри отведённого ей срока
     })
     .catch(() => loadVitrina());   // статики нет, битая или протухла — идём в Apps Script
+}
+
+// Тихая перепроверка живым каталогом: лоадер не показываем, ошибки не выносим клиенту —
+// на экране остаётся уже нарисованная статика, а это ровно то, что было бы и без проверки.
+function revalidateVitrina(attempt){
+  attempt = attempt || 1;
+  fetch(SUBMIT_URL, {
+    method:'POST',
+    headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ type:'vitrina_list' })
+  })
+    .then(r => r.json())
+    .then(items => {
+      // Пустой ответ — это холодный старт Apps Script, а не пустая витрина: затирать им
+      // рабочий каталог нельзя, поэтому уходим в общий catch и пробуем ещё раз.
+      if (!Array.isArray(items) || !items.length) throw new Error('пустой каталог');
+      if (catalogKey(items) === shownCatalogKey) return;   // статика была верной
+      if (modalOverlay.classList.contains('open')){
+        pendingCatalog = items;   // клиент заполняет форму — не выдёргиваем карточки из-под него
+        // Молчать можно только пока речь о чужих карточках. Если забрали именно тот букет,
+        // который он сейчас оформляет, заявка уйдёт на несуществующее — блокируем отправку.
+        if (currentItem && !items.some(i => i.name === currentItem.name && i.price === currentItem.price)) {
+          formErr.textContent = 'Этот букет только что забрали. Закройте окно и выберите другой — каталог уже обновился.';
+          formErr.style.display = 'block';
+          sendBtn.disabled = true;
+          sendBtn.style.opacity = '0.5';
+        }
+        return;
+      }
+      renderVitrina(items);
+    })
+    .catch(() => {
+      if (attempt < VITRINA_MAX_TRIES) setTimeout(() => revalidateVitrina(attempt + 1), 1200);
+    });
+}
+
+function applyPendingCatalog(){
+  if (!pendingCatalog) return;
+  const items = pendingCatalog;
+  pendingCatalog = null;
+  if (catalogKey(items) !== shownCatalogKey) renderVitrina(items);
 }
 
 function loadVitrina(attempt){
