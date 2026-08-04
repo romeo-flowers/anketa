@@ -6,8 +6,10 @@ name: Кеш витрины
 # Свежесть не страдает: у самого Apps Script кеш каталога и так 600 сек.
 on:
   schedule:
-    - cron: '*/10 * * * *'
-  workflow_dispatch:        # можно дёрнуть руками из вкладки Actions
+    - cron: '*/10 * * * *'   # GitHub исполняет best-effort: по факту раз в 1-3.5 часа
+  workflow_dispatch:         # можно дёрнуть руками из вкладки Actions
+  repository_dispatch:       # надёжный источник: триггер Apps Script warmVitrinaCache шлёт
+    types: [vitrina-refresh] # событие каждые 5 минут — не зависит от расписания GitHub
 
 permissions:
   contents: write
