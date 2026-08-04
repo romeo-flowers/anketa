@@ -1,9 +1,12 @@
 name: Кеш витрины
 
-# Витрина тянула каталог напрямую из Apps Script — он отвечает 3.7-4.4 сек, и всё это
-# время клиент смотрел на лоадер. Здесь каталог раз в 10 минут складывается в статический
-# vitrina/data.json: страница берёт его с GitHub Pages (CDN, ~50 мс) и рисуется сразу.
-# Свежесть не страдает: у самого Apps Script кеш каталога и так 600 сек.
+# Витрина берёт каталог из статического vitrina/data.json (GitHub Pages, CDN ~50 мс) — иначе
+# клиент ждал бы 3.7-4.4 сек прямой ответ Apps Script. Этот workflow держит data.json свежим.
+#
+# ВАЖНО про корректность: страница ТЕПЕРЬ всегда перепроверяет каталог живым запросом после
+# отрисовки из статики (см. vitrina/index.html, revalidateVitrina). То есть даже устаревший
+# data.json не покажет проданное как доступное — клиент сам подтянет живой список за ~4 сек.
+# Поэтому подвисание этого обновления — потеря скорости, НЕ ошибка наличия.
 on:
   schedule:
     - cron: '*/10 * * * *'   # GitHub исполняет best-effort: по факту раз в 1-3.5 часа
@@ -23,18 +26,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # нужна полная история, чтобы узнать возраст vitrina/data.json
 
       - name: Забрать каталог из Apps Script
         run: |
+          set -e
+          # Возраст текущего data.json = время последнего коммита, который его тронул.
+          LAST_COMMIT_TS=$(git log -1 --format=%ct -- vitrina/data.json || echo 0)
+          export LAST_COMMIT_TS
           python3 - <<'PY'
-          import json, sys, time, urllib.request
+          import json, os, sys, time, urllib.request
 
           URL = ("https://script.google.com/macros/s/"
                  "AKfycbx0FYyE3hckyyyhzZPbf4X2gELlhLoGNj8YbRfJcjj1bTbKlKjo-n16cMUWN7SBnxDepw/exec")
 
-          # Три попытки: холодный старт Apps Script иногда отдаёт пусто или отваливается
-          # (та же причина, по которой в самой витрине стоит ретрай). Если не вышло ни разу —
-          # job ПАДАЕТ намеренно: GitHub пришлёт письмо, иначе каталог замрёт незаметно.
+          # Три попытки: холодный старт Apps Script / временный сбой Posiflora иногда отдают
+          # пусто или HTML вместо каталога (та же причина, по которой в самой витрине стоит ретрай).
           items = None
           for attempt in range(1, 4):
               try:
@@ -51,14 +59,27 @@ jobs:
                   print(f"попытка {attempt}: {e}")
               time.sleep(5)
 
-          if not items:
-              print("Apps Script не отдал каталог с трёх попыток.")
-              print("Витрина продолжает работать на прежнем data.json, но он устаревает.")
-              sys.exit(1)          # падаем осознанно — чтобы пришло уведомление
+          if items:
+              with open("vitrina/data.json", "w", encoding="utf-8") as f:
+                  json.dump(items, f, ensure_ascii=False, separators=(",", ":"))
+              print(f"записано букетов: {len(items)}")
+              sys.exit(0)
 
-          with open("vitrina/data.json", "w", encoding="utf-8") as f:
-              json.dump(items, f, ensure_ascii=False, separators=(",", ":"))
-          print(f"записано букетов: {len(items)}")
+          # Каталог не отдался. Раньше здесь был безусловный sys.exit(1) — но теперь триггер
+          # шлёт событие каждые 5 минут, и на любом коротком сбое Posiflora это давало письмо
+          # каждые 5 минут. Плюс клиент и так перепроверяет каталог вживую, так что устаревший
+          # data.json безопасен. Поэтому шумим ТОЛЬКО если каталог заморожен по-настоящему долго.
+          STALE_LIMIT_MIN = 180
+          last = int(os.environ.get("LAST_COMMIT_TS") or 0)
+          age_min = (time.time() - last) / 60 if last else 1e9
+          if age_min < STALE_LIMIT_MIN:
+              print(f"Каталог не отдался (транзиент). data.json свежий — {age_min:.0f} мин назад, "
+                    f"порог {STALE_LIMIT_MIN}. Клиент всё равно перепроверяет вживую. Выходим тихо, без письма.")
+              sys.exit(0)
+          print(f"Каталог не обновляется уже дольше {STALE_LIMIT_MIN} мин "
+                f"(последний data.json — {age_min:.0f} мин назад). Похоже на затяжной сбой — "
+                f"падаем осознанно, чтобы пришло ОДНО письмо.")
+          sys.exit(1)
           PY
 
       - name: Закоммитить, если изменилось
