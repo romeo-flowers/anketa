@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Витрина букетов — Romeo Flowers</title>
-<script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU&apikey=8ce59b28-0d80-4c8f-b6a9-94f2ccd49434&suggest_apikey=a1746453-3c1b-4a13-8ae2-a9c84c1b72da"></script>
+<!-- Яндекс.Карты грузятся не здесь, а по требованию (см. loadYmaps): это 3 МБ из
+     5.5 МБ всей страницы, а нужны они только для подсказки адреса при доставке,
+     тогда как по умолчанию выбран самовывоз. Замер 04.08.2026. -->
 <style>
 @font-face { font-display:swap; font-family:'Circe'; font-weight:300; font-style:normal; src:url('fonts/circe-300.woff2') format('woff2'); }
 @font-face { font-display:swap; font-family:'Circe'; font-weight:400; font-style:normal; src:url('fonts/circe-400.woff2') format('woff2'); }
@@ -973,6 +975,8 @@ function toggleAddress(){
   // ты сам получатель, галку ставим. Клиент может переключить вручную (себе / сюрприз).
   fsame.checked = !isDelivery;
   recipientFields.classList.toggle('show', !fsame.checked);
+  // выбрал доставку — заранее тянем карты, пока он заполняет контакты
+  if (isDelivery) loadYmaps().catch(() => {});
 }
 fpickup.addEventListener('change', toggleAddress);
 fdelivery.addEventListener('change', toggleAddress);
@@ -980,10 +984,29 @@ fdelivery.addEventListener('change', toggleAddress);
 // ─── Автоподсказка адреса (ymaps.suggest — официальный SDK, без CORS-проблем) ──
 let addressDebounce = null;
 
+// Загрузка SDK карт по требованию. Скрипт весит около 3 МБ — больше половины
+// страницы — и нужен только тем, кто выбрал доставку и печатает адрес. Тянем его
+// при выборе доставки (тогда к первому символу адреса он уже готов) и страхуемся
+// вызовом перед самим запросом подсказок.
+const YMAPS_SRC = 'https://api-maps.yandex.ru/2.1/?lang=ru_RU&apikey=8ce59b28-0d80-4c8f-b6a9-94f2ccd49434&suggest_apikey=a1746453-3c1b-4a13-8ae2-a9c84c1b72da';
+let ymapsPromise = null;
+function loadYmaps(){
+  if (ymapsPromise) return ymapsPromise;
+  ymapsPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = YMAPS_SRC;
+    s.async = true;
+    s.onload = () => ymaps.ready(resolve);
+    s.onerror = () => { ymapsPromise = null; reject(new Error('ymaps не загрузился')); };
+    document.head.appendChild(s);
+  });
+  return ymapsPromise;
+}
+
 faddress.addEventListener('input', () => {
   clearTimeout(addressDebounce);
   const text = faddress.value.trim();
-  if (text.length < 3 || typeof ymaps === 'undefined'){
+  if (text.length < 3){
     addressSuggest.classList.remove('show');
     addressSuggest.innerHTML = '';
     return;
@@ -992,14 +1015,15 @@ faddress.addEventListener('input', () => {
 });
 
 function fetchAddressSuggestions(text){
-  ymaps.ready(() => {
-    ymaps.suggest(text, {
+  // подсказки — удобство, а не обязательный шаг: если SDK не доехал, поле
+  // остаётся обычным текстовым, и заказ всё равно можно оформить
+  loadYmaps()
+    .then(() => ymaps.suggest(text, {
       results: 6,
       boundedBy: [[53.05, 63.4], [53.35, 63.85]], // область Костаная
-    })
-      .then(items => renderAddressSuggestions(items || []))
-      .catch(() => { addressSuggest.classList.remove('show'); });
-  });
+    }))
+    .then(items => renderAddressSuggestions(items || []))
+    .catch(() => { addressSuggest.classList.remove('show'); });
 }
 
 function renderAddressSuggestions(items){
@@ -1069,8 +1093,18 @@ document.getElementById('sendBtn').addEventListener('click', () => {
   }).catch(()=>{});
 
   if (currentCard) currentCard.classList.add('sent');
+  if (currentItem) sentItems.add(itemKey(currentItem));
   closeModal();
 });
+
+// Позиции, по которым клиент уже отправил заявку. Держим отдельно от DOM: грид
+// перерисовывается целиком, когда доезжает свежий каталог, и раньше вместе с ним
+// пропадали «Заявку получили» и ссылка на оплату Kaspi — клиент решал, что заявка
+// не ушла, и отправлял её второй раз. Воспроизведено 04.08.2026.
+const sentItems = new Set();
+function itemKey(item){
+  return (item && item.name) + '|' + (item && item.price);
+}
 
 function renderCard(item, idx){
   const card = document.createElement('div');
@@ -1097,39 +1131,57 @@ function renderCard(item, idx){
     '</div>';
 
   card.querySelector('.want').addEventListener('click', () => openModal(item, card));
+  // заявка по этой позиции уже ушла — возвращаем подтверждение после перерисовки
+  if (sentItems.has(itemKey(item))) card.classList.add('sent');
 
   return card;
 }
 
+// Выбранный диапазон цен переживает перерисовку каталога: свежий список молча
+// сбрасывал фильтр на «Все», и человек, отобравший букеты до 15 000, вдруг снова
+// видел всю витрину, ничего не нажимая.
+let activeFilter = 'all';
+const FILTER_TIERS = [
+  { key:'all', label:'Все',        test:() => true },
+  { key:'lo',  label:'до 15 000',  test:p => p > 0 && p < 15000 },
+  { key:'mid', label:'15–25 000',  test:p => p >= 15000 && p < 25000 },
+  { key:'hi',  label:'от 25 000',  test:p => p >= 25000 },
+];
+function applyFilter(key){
+  const tier = FILTER_TIERS.find(t => t.key === key) || FILTER_TIERS[0];
+  document.querySelectorAll('#grid .card').forEach(card => {
+    const p = Number(card.dataset.price);
+    const show = tier.key === 'all' || (!isNaN(p) && tier.test(p));
+    card.style.display = show ? '' : 'none';
+  });
+}
 function buildFilterBar(items){
   const bar = document.getElementById('filterBar');
   if (!bar) return;
   const prices = items.map(it => Number(it.price)).filter(n => !isNaN(n) && n > 0);
-  const tiers = [
-    { key:'all', label:'Все',        test:() => true },
-    { key:'lo',  label:'до 15 000',  test:p => p > 0 && p < 15000 },
-    { key:'mid', label:'15–25 000',  test:p => p >= 15000 && p < 25000 },
-    { key:'hi',  label:'от 25 000',  test:p => p >= 25000 },
-  ];
   bar.innerHTML = '';
-  tiers.forEach(t => {
+  const shownKeys = [];
+  FILTER_TIERS.forEach(t => {
     const cnt = t.key === 'all' ? prices.length : prices.filter(t.test).length;
     if (t.key !== 'all' && cnt === 0) return; // прячем пустой диапазон
+    shownKeys.push(t.key);
     const chip = document.createElement('button');
-    chip.className = 'filter-chip' + (t.key === 'all' ? ' active' : '');
+    chip.className = 'filter-chip';
+    chip.dataset.key = t.key;
     chip.innerHTML = t.label + ' <span class="cnt">' + cnt + '</span>';
     chip.addEventListener('click', () => {
-      bar.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-      document.querySelectorAll('#grid .card').forEach(card => {
-        const p = Number(card.dataset.price);
-        const show = t.key === 'all' || (!isNaN(p) && t.test(p));
-        card.style.display = show ? '' : 'none';
-      });
+      activeFilter = t.key;
+      bar.querySelectorAll('.filter-chip').forEach(c => c.classList.toggle('active', c === chip));
+      applyFilter(activeFilter);
       if (window.scrollY > bar.offsetTop) window.scrollTo(0, bar.offsetTop);
     });
     bar.appendChild(chip);
   });
+  // диапазон мог опустеть после обновления каталога — тогда честнее показать всё
+  if (shownKeys.indexOf(activeFilter) === -1) activeFilter = 'all';
+  const activeChip = bar.querySelector('.filter-chip[data-key="' + activeFilter + '"]');
+  if (activeChip) activeChip.classList.add('active');
+  applyFilter(activeFilter);
   bar.style.display = 'flex';
 }
 
