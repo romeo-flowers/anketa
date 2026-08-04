@@ -94,6 +94,41 @@ main{padding:28px 20px 10px;}
 .premium-sub{font-size:12px;color:var(--muted);margin-top:2px;}
 .premium-strip{display:flex;gap:14px;overflow-x:auto;padding-bottom:6px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
 .premium-strip::-webkit-scrollbar{display:none;}
+
+/* ─── Листалка горизонтальных лент на ПК ────────────────────
+   Полоса прокрутки у лент скрыта, а колесо мыши крутит страницу — с телефона
+   ленту листают пальцем, а с компьютера листать было нечем (Азамат, 04.08.2026).
+   Стрелки и перетаскивание мышью включаются только там, где есть курсор. */
+.strip-wrap{position:relative;}
+.strip-nav{
+  display:none;
+  position:absolute;
+  top:50%;
+  transform:translateY(-50%);
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.94);
+  color:var(--ink);
+  font-family:inherit;
+  font-size:18px;
+  line-height:1;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  z-index:5;
+  box-shadow:0 2px 8px rgba(44,42,39,.14);
+  transition:background .12s,color .12s,border-color .12s;
+}
+.strip-nav:hover{background:#fff;border-color:var(--sage-dark);color:var(--sage-dark);}
+.strip-nav.prev{left:-8px;}
+.strip-nav.next{right:-8px;}
+@media (hover:hover) and (pointer:fine){
+  .strip-nav.show{display:flex;}
+  .premium-strip,.addons-strip{cursor:grab;}
+  .premium-strip.dragging,.addons-strip.dragging{cursor:grabbing;user-select:none;}
+}
 .premium-strip .card{flex:0 0 220px;width:220px;}
 .grid{
   display:grid;
@@ -753,6 +788,89 @@ const ADDONS = [
   {name:'Акула', price:9000, photo:'addons/shark.jpg'},
   {name:'Секатор', price:2500, photo:'addons/secateur.jpg'},
 ];
+// ─── Листалка лент для ПК ───────────────────────────────────────
+// Оборачивает ленту в контейнер со стрелками и включает перетаскивание мышью.
+// Стрелки показываются только когда есть куда листать (см. updateStripNav) и
+// только на устройствах с курсором — правило @media в стилях. Колесо мыши
+// намеренно не трогаем: перехват сломал бы обычную прокрутку страницы.
+function enhanceStrip(strip){
+  if (!strip || strip.dataset.enhanced) return;
+  strip.dataset.enhanced = '1';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'strip-wrap';
+  strip.parentNode.insertBefore(wrap, strip);
+  wrap.appendChild(strip);
+
+  function makeBtn(cls, label, glyph){
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'strip-nav ' + cls;
+    b.setAttribute('aria-label', label);
+    b.textContent = glyph;
+    wrap.appendChild(b);
+    return b;
+  }
+  const prev = makeBtn('prev', 'Предыдущие', '‹');
+  const next = makeBtn('next', 'Следующие', '›');
+
+  function page(dir){
+    strip.scrollBy({ left: dir * Math.max(strip.clientWidth * 0.8, 200), behavior: 'smooth' });
+  }
+  prev.addEventListener('click', () => page(-1));
+  next.addEventListener('click', () => page(1));
+
+  strip.addEventListener('scroll', () => updateStripNav(strip), { passive: true });
+  window.addEventListener('resize', () => updateStripNav(strip));
+  // карточки в ленту добавляются после её создания — следим за составом
+  new MutationObserver(() => updateStripNav(strip)).observe(strip, { childList: true });
+
+  // Перетаскивание мышью. Клик, завершивший перетаскивание, гасим:
+  // иначе «дотянул ленту и отпустил» открывало бы форму заказа.
+  let holding = false, startX = 0, startScroll = 0, moved = false;
+  // Без этого браузер на первом же движении начинает тащить саму фотографию
+  // (нативный drag-and-drop картинки): лента застревает, а mouseup до нас уже
+  // не доходит и курсор остаётся «схваченным». Проверено 04.08.2026.
+  strip.addEventListener('dragstart', e => e.preventDefault());
+  strip.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    holding = true; moved = false;
+    startX = e.clientX;
+    startScroll = strip.scrollLeft;
+  });
+  function endDrag(){
+    if (!holding) return;
+    holding = false;
+    strip.classList.remove('dragging');
+    if (moved){
+      strip.addEventListener('click', ev => { ev.stopPropagation(); ev.preventDefault(); },
+        { capture: true, once: true });
+    }
+  }
+  window.addEventListener('mousemove', e => {
+    if (!holding) return;
+    if (!e.buttons){ endDrag(); return; }   // кнопку отпустили вне окна
+    const dx = e.clientX - startX;
+    if (!moved && Math.abs(dx) > 4){ moved = true; strip.classList.add('dragging'); }
+    if (moved){ strip.scrollLeft = startScroll - dx; e.preventDefault(); }
+  });
+  window.addEventListener('mouseup', endDrag);
+
+  updateStripNav(strip);
+}
+
+// Прячет стрелку, если в её сторону листать уже нечего. Вызывается и снаружи:
+// у ленты допов размеры появляются только когда открылась форма заказа.
+function updateStripNav(strip){
+  if (!strip || !strip.parentNode) return;
+  const prev = strip.parentNode.querySelector('.strip-nav.prev');
+  const next = strip.parentNode.querySelector('.strip-nav.next');
+  if (!prev || !next) return;
+  const max = strip.scrollWidth - strip.clientWidth;
+  prev.classList.toggle('show', max > 4 && strip.scrollLeft > 4);
+  next.classList.toggle('show', max > 4 && strip.scrollLeft < max - 4);
+}
+
 let selectedAddons = new Set();
 function renderAddons(){
   const strip = document.getElementById('addonsStrip');
@@ -802,6 +920,7 @@ function updateTotal(){
   el.style.display = '';
 }
 renderAddons();
+enhanceStrip(document.getElementById('addonsStrip'));
 
 function openModal(item, card){
   currentItem = item;
@@ -831,6 +950,8 @@ function openModal(item, card){
   resetAddons();
   updateTotal();
   modalOverlay.classList.add('open');
+  // до открытия форма скрыта, у ленты допов нулевые размеры — стрелки считаем сейчас
+  updateStripNav(document.getElementById('addonsStrip'));
 }
 
 function closeModal(){
@@ -1026,6 +1147,7 @@ function renderPremium(){
   PREMIUM.forEach((item, i) => strip.appendChild(renderCard(item, 'p' + i)));
 }
 renderPremium();
+enhanceStrip(document.getElementById('premiumStrip'));
 
 const VITRINA_MAX_TRIES = 4;
 // Премиум-лента лежит в HTML и раньше появлялась мгновенно, пока каталог ещё грузился из
@@ -1035,6 +1157,8 @@ const VITRINA_MAX_TRIES = 4;
 function showPremium(){
   const b = document.getElementById('premiumBlock');
   if (b) b.style.display = '';
+  // до этого момента блок скрыт и у ленты нулевая ширина — стрелки считаем после показа
+  updateStripNav(document.getElementById('premiumStrip'));
 }
 function showVitrinaEmpty(){
   document.getElementById('loader').style.display = 'none';
