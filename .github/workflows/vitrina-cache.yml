@@ -9,7 +9,8 @@ name: Кеш витрины
 # Поэтому подвисание этого обновления — потеря скорости, НЕ ошибка наличия.
 on:
   schedule:
-    - cron: '*/10 * * * *'   # GitHub исполняет best-effort: по факту раз в 1-3.5 часа
+    - cron: '17 * * * *'     # раз в час, ЗАПАСНОЙ путь: основной — repository_dispatch
+                             # каждые 5 мин. Частый cron давал лишние параллельные прогоны.
   workflow_dispatch:         # можно дёрнуть руками из вкладки Actions
   repository_dispatch:       # надёжный источник: триггер Apps Script warmVitrinaCache шлёт
     types: [vitrina-refresh] # событие каждые 5 минут — не зависит от расписания GitHub
@@ -19,7 +20,13 @@ permissions:
 
 concurrency:
   group: vitrina-cache
-  cancel-in-progress: true
+  # НЕ отменять идущий прогон. 05.08.2026: расписание стартовало через 20 сек после
+  # dispatch-прогона, отменило его — но отменённый успел закоммитить и запушить, а
+  # расписанный уже держал checkout старого коммита, и его push отлетел
+  # non-fast-forward. Пришло письмо «All jobs have failed», хотя каталог обновился.
+  # cancel-in-progress: false ставит прогоны в очередь, поэтому checkout следующего
+  # всегда происходит уже после push предыдущего.
+  cancel-in-progress: false
 
 jobs:
   refresh:
@@ -126,5 +133,12 @@ jobs:
           else
             git add vitrina/data.json
             git commit -m "chore(vitrina): обновлён кеш каталога"
-            git push
+            # Второй рубеж против гонки push: даже при очереди прогонов remote мог уехать
+            # (сюда же коммитят люди). Подтягиваем и повторяем, вместо падения с письмом.
+            for i in 1 2 3; do
+              git push && break
+              echo "push отлетел, попытка $i — подтягиваю remote"
+              git pull --rebase --autostash origin main || exit 1
+              sleep 2
+            done
           fi
