@@ -59,11 +59,17 @@ jobs:
           # ⚠️ И это НЕ «время последнего успешного запуска»: тихий выход ниже тоже даёт успешный
           # запуск, так что по нему затяжной сбой маскировал бы сам себя до бесконечности.
           LAST_OK_TS=$(cat .lastok 2>/dev/null || echo "")
+          MARKER_SRC=cache
           if [ -z "$LAST_OK_TS" ]; then
-            # Кеша ещё нет (первый запуск после правки) — падаем на прежнюю метрику.
+            # Кеша нет: либо первый запуск после правки, либо кеш Actions вытеснен
+            # (GitHub чистит неиспользуемые за 7 дней и при переполнении репозитория).
+            # Падаем на прежнюю метрику — возраст коммита data.json, — но она заведомо
+            # хуже: ночью каталог не меняется, коммитов нет, и файл «стареет» без причины.
+            # Поэтому для неё отдельный, куда более щадящий порог (см. STALE_LIMIT_FALLBACK).
             LAST_OK_TS=$(git log -1 --format=%ct -- vitrina/data.json || echo 0)
+            MARKER_SRC=commit
           fi
-          export LAST_OK_TS
+          export LAST_OK_TS MARKER_SRC
           python3 - <<'PY'
           import json, os, sys, time, urllib.request
 
@@ -102,7 +108,10 @@ jobs:
           # шлёт событие каждые 5 минут, и на любом коротком сбое Posiflora это давало письмо
           # каждые 5 минут. Плюс клиент и так перепроверяет каталог вживую, так что устаревший
           # data.json безопасен. Поэтому шумим ТОЛЬКО если каталог заморожен по-настоящему долго.
-          STALE_LIMIT_MIN = 180
+          # Порог зависит от того, чем меряем. Отметка живого забора точна → 3 часа хватает.
+          # Возраст коммита — метрика-заменитель, она «стареет» сама по себе, поэтому 12 часов,
+          # иначе тихая ночь плюс один транзиентный 404 снова дадут ложное письмо.
+          STALE_LIMIT_MIN = 180 if os.environ.get("MARKER_SRC") == "cache" else 720
           last = int(os.environ.get("LAST_OK_TS") or 0)
           age_min = (time.time() - last) / 60 if last else 1e9
           if age_min < STALE_LIMIT_MIN:
@@ -130,15 +139,32 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           if git diff --quiet -- vitrina/data.json; then
             echo "каталог не изменился"
-          else
+            exit 0
+          fi
+          # Второй рубеж против гонки push: remote мог уехать, пока мы забирали каталог
+          # (сюда же коммитят люди). НЕ через `git pull --rebase`: у нас и у них изменён
+          # ОДИН И ТОТ ЖЕ файл, поэтому rebase почти всегда упирается в конфликт и падает.
+          # Для файла-кеша верная семантика — «побеждает последний»: берём свежий main и
+          # накладываем свой каталог заново.
+          cp vitrina/data.json "$RUNNER_TEMP/data.json.new"
+          pushed=0
+          for i in 1 2 3; do
             git add vitrina/data.json
-            git commit -m "chore(vitrina): обновлён кеш каталога"
-            # Второй рубеж против гонки push: даже при очереди прогонов remote мог уехать
-            # (сюда же коммитят люди). Подтягиваем и повторяем, вместо падения с письмом.
-            for i in 1 2 3; do
-              git push && break
-              echo "push отлетел, попытка $i — подтягиваю remote"
-              git pull --rebase --autostash origin main || exit 1
-              sleep 2
-            done
+            git commit -q -m "chore(vitrina): обновлён кеш каталога" || true
+            if git push -q origin HEAD:main; then pushed=1; break; fi
+            echo "push отлетел (попытка $i) — беру свежий main и накладываю каталог заново"
+            git fetch -q origin main
+            git reset -q --hard origin/main
+            cp "$RUNNER_TEMP/data.json.new" vitrina/data.json
+            if git diff --quiet -- vitrina/data.json; then
+              echo "на свежем main каталог уже такой же — коммитить нечего"
+              pushed=1; break
+            fi
+            sleep 2
+          done
+          # Раньше цикл заканчивался молча: последней командой был sleep, шаг возвращал успех,
+          # и не прошедший push никак себя не проявлял.
+          if [ "$pushed" != "1" ]; then
+            echo "push не прошёл за 3 попытки — это уже не гонка, нужен человек"
+            exit 1
           fi
