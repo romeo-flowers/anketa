@@ -1058,6 +1058,20 @@
     setLoading(true);
     track('submit');   // дошёл до отправки — все проверки пройдены
 
+    sendAnketa(formData, 1);
+  }
+
+  // 🔴 Отправка С ПОВТОРАМИ (06.08.2026). Раньше попытка была одна: fetch упал —
+  // показали «Ошибка соединения», и заполненная анкета оставалась только в браузере.
+  // За неделю так потерялись ТРИ анкеты (04.08 и две 05.08, «Load failed» и
+  // «Ошибка соединения») — около 12% отправок. Причина не в форме: Apps Script /exec
+  // периодически отдаёт 404 и обрывает соединение на ровном месте.
+  //
+  // Повтор БЕЗОПАСЕН, сервер к нему готов: submitForm ищет строку по телефону через
+  // getOrCreateAnketaRow (не добавляет новую), всё обёрнуто в LockService, а флаг
+  // wasAlreadyFilled не даёт задвоить начисление баллов — это writing прямо описан
+  // в комментарии к локу как защита от «ретрая при плохой связи».
+  function sendAnketa(formData, attempt) {
     fetch(SUBMIT_URL, {
       method: 'POST',
       body: JSON.stringify(formData),
@@ -1065,7 +1079,14 @@
     })
     .then(function(r) { return r.json(); })
     .then(function(res) { track('success'); onSuccess(res); })
-    .catch(function(err) { track('fail', String(err && err.message || err)); onError(err); });
+    .catch(function(err) {
+      track('fail', 'попытка ' + attempt + ': ' + String(err && err.message || err));
+      if (attempt < 3) {
+        setTimeout(function() { sendAnketa(formData, attempt + 1); }, attempt * 2500);
+        return;   // кнопка остаётся заблокированной — клиент не жмёт второй раз
+      }
+      onError(err);
+    });
   }
 
   function getPhone() {
