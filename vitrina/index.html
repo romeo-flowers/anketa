@@ -906,6 +906,11 @@ function updateStripNav(strip){
 }
 
 let selectedAddons = new Set();
+// Сумма и цена букета, показанные клиенту в блоке «К оплате». Уходят в заявку, чтобы
+// менеджер выставлял счёт сразу из сообщения, а не искал букет по названию на витрине
+// (просьба управляющей 18.08.2026). null — если цена букета неизвестна.
+let lastShownTotal = null;
+let lastShownPrice = null;
 function renderAddons(){
   const strip = document.getElementById('addonsStrip');
   strip.innerHTML = '';
@@ -939,6 +944,10 @@ function updateTotal(){
   const base = Number(currentItem.price);
   const addonSum = Array.from(selectedAddons).reduce((s,i) => s + Number(ADDONS[i].price || 0), 0);
   if (isNaN(base)){
+    // Цена букета неизвестна — суммы нет. Обнуляем ОБЯЗАТЕЛЬНО: иначе в заявку уедет
+    // сумма предыдущего открытого букета, и менеджер выставит счёт не на тот заказ.
+    lastShownTotal = null;
+    lastShownPrice = null;
     if (addonSum > 0){
       el.innerHTML = '<div class="ot-sum">Допы: <b>' + addonSum.toLocaleString('ru-RU') + ' ₸</b> + цена букета</div>';
       el.style.display = '';
@@ -950,6 +959,11 @@ function updateTotal(){
   const freeDelivery = addonSum > 0 && addonSum >= FREE_DELIVERY_MIN_ADDON;
   const fee = (isDelivery && !freeDelivery) ? DELIVERY_FEE : 0;
   const total = goods + fee;
+  // Запоминаем ровно ту сумму, которую УВИДЕЛ клиент, и её же кладём в заявку.
+  // Пересчитывать её второй раз на сервере нельзя: любая правка правил доставки или допов
+  // разведёт две формулы, и менеджер выставит счёт не на то, что человеку пообещали.
+  lastShownTotal = total;
+  lastShownPrice = base;
 
   let html = '';
   if (addonSum > 0){
@@ -995,6 +1009,9 @@ enhanceStrip(document.getElementById('addonsStrip'));
 function openModal(item, card){
   currentItem = item;
   currentCard = card;
+  // Сбрасываем на КАЖДОМ открытии: сумма принадлежит конкретному букету, а не сессии.
+  lastShownTotal = null;
+  lastShownPrice = null;
   modalPhoto.style.backgroundImage = item.photo ? 'url(\'' + item.photo + '\')' : 'none';
   modalName.textContent = cleanName(item.name);
   modalPrice.textContent = fmtPrice(item.price);
@@ -1172,6 +1189,8 @@ document.getElementById('sendBtn').addEventListener('click', () => {
     bonusPointsBalance: useBonusPoints ? checkoutBonusPoints : 0,
     addons: getSelectedAddons(),
     deliveryFee: currentDeliveryFee(),
+    price: lastShownPrice,
+    total: lastShownTotal,
     // Ключ заявки: одинаковый у всех повторов одной отправки. Нужен серверу, чтобы
     // не записать заявку дважды, если первый запрос ДОШЁЛ, а ответ потерялся.
     orderKey: 'vo-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8)
