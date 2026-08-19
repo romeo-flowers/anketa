@@ -577,10 +577,17 @@
   // Аналитика молчаливая: любая ошибка здесь не должна мешать человеку заполнять анкету.
   function track(event, detail) {
     try {
+      // Источник из ?utm_source= (19.08.2026). Без него рекламный трафик на анкете
+      // неотличим от обычного — ровно та дыра, из-за которой пять дней теста ИИ-модели
+      // показали «577 заходов на хаб, 5 кликов», но не дали понять, где именно теряем.
+      // Реклама будет вести на анкету с меткой, и воронку станет видно отдельно.
+      var _src = '';
+      try { _src = (new URLSearchParams(location.search).get('utm_source') || '').slice(0, 40); } catch (e) {}
       var body = JSON.stringify({
         type: 'anketa_event', event: event,
         phone: (typeof getPhone === 'function' ? getPhone() : '') || '',
-        detail: detail || ''
+        detail: detail || '',
+        src: _src
       });
       if (navigator.sendBeacon && navigator.sendBeacon(SUBMIT_URL, new Blob([body], { type: 'text/plain;charset=utf-8' }))) return;
       fetch(SUBMIT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: body, keepalive: true });
