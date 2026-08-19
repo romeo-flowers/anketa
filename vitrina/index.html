@@ -1472,6 +1472,32 @@ function loadVitrina(attempt){
     });
 }
 loadVitrinaFast();
+
+// Счётчик заходов на витрину (19.08.2026). До этого страница считала только ЗАЯВКИ, а
+// сколько людей вообще пришло — не знал никто. Из-за этого тест рекламы с ИИ-моделью
+// нельзя было довести до конца: видно 577 заходов на хаб и 5 кликов, а что происходит
+// на самой витрине — слепая зона.
+// Шлём тем же событием, что хаб и каталог 1 сентября, но с page:'vitrina' — иначе заходы
+// витрины влились бы в статистику шапки профиля и испортили её отчёт.
+(function () {
+  try {
+    var qs = new URLSearchParams(location.search);
+    var payload = JSON.stringify({
+      type: 'hub_event',
+      event: 'view',
+      target: '',
+      src: (qs.get('utm_source') || 'vitrina').slice(0, 40),
+      ua: /android|iphone|ipad|mobile/i.test(navigator.userAgent) ? 'mobile' : 'desktop',
+      page: 'vitrina',
+      u: (qs.get('u') || '').replace(/[^a-f0-9]/gi, '').slice(0, 16)
+    });
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(SUBMIT_URL, new Blob([payload], { type: 'text/plain;charset=UTF-8' }));
+    } else {
+      fetch(SUBMIT_URL, { method: 'POST', body: payload, headers: { 'Content-Type': 'text/plain' }, keepalive: true });
+    }
+  } catch (e) { /* счётчик не важнее витрины */ }
+})();
 </script>
 
 </body>
