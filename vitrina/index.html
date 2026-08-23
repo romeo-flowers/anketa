@@ -602,6 +602,41 @@ footer{
 const SUBMIT_URL = 'https://script.google.com/macros/s/AKfycbx0FYyE3hckyyyhzZPbf4X2gELlhLoGNj8YbRfJcjj1bTbKlKjo-n16cMUWN7SBnxDepw/exec';
 const KASPI_LINK = 'https://pay.kaspi.kz/pay/qlv5kzz7';
 
+// 🔴 Разметка витрины, 23.08.2026.
+//
+// ЗАЧЕМ. Счётчик заходов на витрине был, а что человек делает ДАЛЬШЕ — слепая зона.
+// Три дня подряд сводка показывала 46–62 захода и ноль заявок, и ответить на вопрос
+// «почему не покупают» было нечем: сломана форма или страница не убеждает — из данных
+// не видно. Форма, как выяснилось, исправна (заявка пришла 22.08 в 20:39), значит
+// теряем людей где-то между приходом и отправкой. Где именно — вот это и меряем.
+//
+// Три точки дают три разных диагноза:
+//   card_open    — не открывают карточки вовсе → проблема в витрине: цены, фото, первый экран
+//   send_press   — открывают, но не жмут отправку → проблема в карточке или в форме
+//   request_sent — жмут, но заявка не уходит → техническая беда
+//
+// Шлём тем же событием, что каталог 1 сентября, с page:'vitrina'. Ошибки глушим молча:
+// счётчик не важнее витрины, падать из-за него страница не должна.
+function vtrack(target) {
+  try {
+    var qs = new URLSearchParams(location.search);
+    var payload = JSON.stringify({
+      type: 'hub_event',
+      event: 'click',
+      target: String(target || '').slice(0, 30),
+      src: (qs.get('utm_source') || 'vitrina').slice(0, 40),
+      ua: /android|iphone|ipad|mobile/i.test(navigator.userAgent) ? 'mobile' : 'desktop',
+      page: 'vitrina',
+      u: (qs.get('u') || '').replace(/[^a-f0-9]/gi, '').slice(0, 16)
+    });
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(SUBMIT_URL, new Blob([payload], { type: 'text/plain;charset=UTF-8' }));
+    } else {
+      fetch(SUBMIT_URL, { method: 'POST', body: payload, headers: { 'Content-Type': 'text/plain' }, keepalive: true });
+    }
+  } catch (e) { }
+}
+
 function fmtPrice(p){
   const n = Number(p);
   if (isNaN(n)) return p;
@@ -1007,6 +1042,7 @@ renderAddons();
 enhanceStrip(document.getElementById('addonsStrip'));
 
 function openModal(item, card){
+  vtrack('card_open');   // первая ступень воронки: человек открыл карточку букета
   currentItem = item;
   currentCard = card;
   // Сбрасываем на КАЖДОМ открытии: сумма принадлежит конкретному букету, а не сессии.
@@ -1155,6 +1191,9 @@ faddress.addEventListener('blur', () => {
 });
 
 document.getElementById('sendBtn').addEventListener('click', () => {
+  // Вторая ступень: нажал «отправить». Считаем ДО проверки полей — незаполненное поле
+  // это тоже поведение, и если люди упираются именно тут, мы хотим это видеть.
+  vtrack('send_press');
   const name = fname.value.trim();
   const phone = fphone.value.trim();
   const sameRecipient = fsame.checked;
@@ -1219,7 +1258,13 @@ function sendOrder(payload, card, attempt){
     headers: {'Content-Type':'text/plain'},
     body: JSON.stringify(payload)
   })
-  .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+  .then(r => {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    // Третья ступень: заявка реально дошла. Считаем только на первой попытке —
+    // повторы после обрыва связи это тот же человек и тот же букет.
+    if (attempt <= 1) vtrack('request_sent');
+    return r.text();
+  })
   .catch(() => {
     if (attempt < 3){ setTimeout(() => sendOrder(payload, card, attempt + 1), attempt * 2500); return; }
     // Три попытки не прошли — честно говорим клиенту, а не оставляем «всё хорошо».
