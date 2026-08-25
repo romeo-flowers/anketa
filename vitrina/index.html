@@ -90,7 +90,7 @@ main{padding:28px 20px 10px;}
 }
 .filter-chip .cnt{opacity:.55;font-size:11px;margin-left:3px;}
 .filter-chip.active .cnt{opacity:.85;}
-.premium-block{padding:2px 2px 4px;margin-bottom:18px;}
+.premium-block{padding:2px 2px 4px;margin:28px 0 18px;}
 .premium-head{margin:0 0 10px;}
 .premium-title{font-family:'Playfair Display',Georgia,serif;font-size:18px;line-height:1.2;}
 .premium-sub{font-size:12px;color:var(--muted);margin-top:2px;}
@@ -521,13 +521,6 @@ footer{
   </header>
 
   <main>
-    <div class="premium-block" id="premiumBlock" style="display:none">
-      <div class="premium-head">
-        <div class="premium-title">⭐ Хиты и премиум</div>
-        <div class="premium-sub">Соберём в любой момент — даже если нет на витрине</div>
-      </div>
-      <div class="premium-strip" id="premiumStrip"></div>
-    </div>
     <div id="loader" class="loader">
       <div class="loader-flowers"><span>🌸</span><span>🌸</span><span>🌸</span></div>
       <div class="loader-text">Загружаем витрину…</div>
@@ -535,6 +528,23 @@ footer{
     <div id="filterBar" class="filter-bar" style="display:none"></div>
     <div id="grid" class="grid"></div>
     <div id="empty" class="empty-state" style="display:none;">Витрина обновляется, загляните чуть позже 🌸</div>
+
+    <!-- 🔴 25.08.2026. Блок перенесён СВЕРХУ ВНИЗ. Замер воронки за 23.08: 83 захода на
+         витрину → 5-6 открыли карточку букета → 1 заявка. То есть 94% уходили, не открыв
+         ни одного букета. Причина была на первом экране: он начинался с премиума по
+         62 000, 57 000 и 43 500 ₸ при нашем среднем чеке 16 289 и трети заказов дешевле
+         12 000. Человек видел цену вчетверо выше своей и решал за две секунды, а доступные
+         букеты по 10-14 тысяч лежали ниже сгиба, за премиум-лентой и фильтром.
+         В фильтр эти позиции не слить: их нет в каталоге, они делаются под заказ — потому
+         и подзаголовок «даже если нет на витрине». Внизу блок работает по назначению:
+         это ответ тому, кто пролистал всё и не выбрал, а не ценник на входе. -->
+    <div class="premium-block" id="premiumBlock" style="display:none">
+      <div class="premium-head">
+        <div class="premium-title">⭐ Хиты и премиум</div>
+        <div class="premium-sub">Соберём в любой момент — даже если нет на витрине</div>
+      </div>
+      <div class="premium-strip" id="premiumStrip"></div>
+    </div>
   </main>
 
   <footer>Romeo Flowers</footer>
