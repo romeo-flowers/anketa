@@ -627,17 +627,63 @@ const KASPI_LINK = 'https://pay.kaspi.kz/pay/qlv5kzz7';
 //
 // Шлём тем же событием, что каталог 1 сентября, с page:'vitrina'. Ошибки глушим молча:
 // счётчик не важнее витрины, падать из-за него страница не должна.
+// 26.08.2026. Два дефекта счётчика, вскрытые при разборе «63 захода → 1 заявка».
+//
+// 1. ИСТОЧНИК ВРАЛ. Стояло `qs.get('utm_source') || 'vitrina'`, а utm_source в ссылках
+//    на витрину не проставлен НИГДЕ — значит в отчёт всегда уезжало слово 'vitrina',
+//    то есть имя самой страницы. Строка «Откуда: vitrina 63» не значила ничего, и это
+//    ровно тот случай, когда метрика всегда показывает одно и то же и тестом не ловится.
+//    Арифметика при этом не сходилась: 25.08 из шапки профиля пришло 52 нажатия
+//    (48 кнопка + 4 карточка букета), а витрина насчитала 63 захода. Одиннадцать человек
+//    приходили мимо шапки, и узнать откуда было нечем — пятая часть трафика вслепую.
+//
+// 2. «ЗАХОД» — ЭТО ОТКРЫТИЕ СТРАНИЦЫ, А НЕ ЧЕЛОВЕК. Дедупить было нечем: идентификатор
+//    посетителя не передавался вовсе. Человек, который открыл витрину, вернулся в шапку
+//    и открыл снова, давал два захода и вдвое ухудшал конверсию. Теперь шлём постоянный
+//    ID из localStorage в поле u — оно уже доезжает до колонки «Код» и на витрине всегда
+//    было пустым (у каталога 1 сентября там код получателя рассылки, но его строки
+//    помечены page:'sept', так что не перепутать).
+//    ⚠️ В приватном окне localStorage может быть недоступен — тогда ID разовый и человек
+//    посчитается новым. Это честнее, чем ронять страницу ради счётчика.
+function vsrc() {
+  try {
+    var utm = (new URLSearchParams(location.search).get('utm_source') || '').slice(0, 40);
+    if (utm) return utm;
+    var r = String(document.referrer || '');
+    if (!r) return 'direct';
+    if (/romeo-flowers\.(kz|github\.io)/i.test(r)) return /\/sept/i.test(r) ? 'sept' : 'hub';
+    if (/instagram|ig\.me/i.test(r)) return 'ig';
+    if (/whatsapp|wa\.me/i.test(r)) return 'wa';
+    if (/2gis/i.test(r)) return '2gis';
+    try { return (new URL(r).hostname || 'other').slice(0, 40); } catch (e) { return 'other'; }
+  } catch (e) { return 'unknown'; }
+}
+
+function vuid() {
+  try {
+    var code = (new URLSearchParams(location.search).get('u') || '').replace(/[^a-f0-9]/gi, '').slice(0, 16);
+    if (code) return code;   // код получателя рассылки важнее, его не затираем
+    var id = '';
+    try { id = localStorage.getItem('romeo_vid') || ''; } catch (e) { }
+    if (!/^[a-f0-9]{12}$/.test(id)) {
+      id = '';
+      for (var i = 0; i < 12; i++) id += '0123456789abcdef'[Math.floor(Math.random() * 16)];
+      try { localStorage.setItem('romeo_vid', id); } catch (e) { }
+    }
+    return id;
+  } catch (e) { return ''; }
+}
+
 function vtrack(target) {
   try {
-    var qs = new URLSearchParams(location.search);
     var payload = JSON.stringify({
       type: 'hub_event',
       event: 'click',
       target: String(target || '').slice(0, 30),
-      src: (qs.get('utm_source') || 'vitrina').slice(0, 40),
+      src: vsrc(),
       ua: /android|iphone|ipad|mobile/i.test(navigator.userAgent) ? 'mobile' : 'desktop',
       page: 'vitrina',
-      u: (qs.get('u') || '').replace(/[^a-f0-9]/gi, '').slice(0, 16)
+      u: vuid()
     });
     if (navigator.sendBeacon) {
       navigator.sendBeacon(SUBMIT_URL, new Blob([payload], { type: 'text/plain;charset=UTF-8' }));
@@ -1536,15 +1582,14 @@ loadVitrinaFast();
 // витрины влились бы в статистику шапки профиля и испортили её отчёт.
 (function () {
   try {
-    var qs = new URLSearchParams(location.search);
     var payload = JSON.stringify({
       type: 'hub_event',
       event: 'view',
       target: '',
-      src: (qs.get('utm_source') || 'vitrina').slice(0, 40),
+      src: vsrc(),   // настоящий источник вместо имени страницы, см. комментарий у vsrc
       ua: /android|iphone|ipad|mobile/i.test(navigator.userAgent) ? 'mobile' : 'desktop',
       page: 'vitrina',
-      u: (qs.get('u') || '').replace(/[^a-f0-9]/gi, '').slice(0, 16)
+      u: vuid()      // постоянный ID посетителя — чтобы отличать людей от открытий
     });
     if (navigator.sendBeacon) {
       navigator.sendBeacon(SUBMIT_URL, new Blob([payload], { type: 'text/plain;charset=UTF-8' }));
