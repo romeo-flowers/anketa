@@ -1491,20 +1491,24 @@ function loadVitrinaFast(){
   fetch('data.json?t=' + Math.floor(Date.now() / 600000), {cache: 'default'})
     .then(r => {
       if (!r.ok) return Promise.reject();
+      // 🔴 30.08.2026. Раньше протухшая статика ОТБРАСЫВАЛАСЬ, и страница шла за живым
+      // каталогом в Apps Script. Сегодня Apps Script упёрся в суточный лимит запросов,
+      // живой каталог не ответил, и клиент увидел бесконечную загрузку, а потом пустую
+      // витрину — при том что рядом лежал нормальный каталог возрастом девять часов.
+      // Правило «лучше ничего, чем старое» стоило магазину витрины за три дня до пика.
+      // Теперь рисуем то, что есть, и молча идём проверять живой. Устаревшая цена это
+      // разговор с клиентом, пустая витрина — потерянный клиент.
       const lm = r.headers.get('last-modified');
       if (lm) {
         const ageH = (Date.now() - new Date(lm).getTime()) / 3600000;
-        if (ageH > DATA_MAX_AGE_H) {
-          console.warn('Кеш каталога протух (' + ageH.toFixed(1) + ' ч) — беру живой');
-          return Promise.reject();
-        }
+        if (ageH > DATA_MAX_AGE_H) console.warn('Кеш каталога протух (' + ageH.toFixed(1) + ' ч) — показываю его и проверяю живой');
       }
       return r.json();
     })
     .then(items => {
       if (!Array.isArray(items) || !items.length) return Promise.reject();
       renderVitrina(items);
-      revalidateVitrina();   // статика могла устареть и внутри отведённого ей срока
+      revalidateVitrina();   // статика могла устареть — живой каталог заменит её, если ответит
     })
     .catch(() => loadVitrina());   // статики нет, битая или протухла — идём в Apps Script
 }
