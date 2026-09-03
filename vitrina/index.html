@@ -394,7 +394,38 @@ footer{
   cursor:pointer;
 }
 .address-suggest .item:hover{background:var(--cream);}
-.modal-form .send{
+.modal-form /* Обе кнопки прибиты к низу и стоят стопкой: заявка сверху, WhatsApp под ней.
+   Иначе запасной путь оказался бы в самом низу формы — там же, где сейчас лежит
+   кнопка отправки, до которой никто не доскроливает. */
+.ask-wa{
+  position:sticky;
+  bottom:0;
+  z-index:3;
+  display:block;
+  text-align:center;
+  text-decoration:none;
+  border:1px solid #25d366;
+  color:#128c3e;
+  background:#fff;
+  padding:11px;
+  font-size:12.5px;
+  letter-spacing:.04em;
+  border-radius:3px;
+  margin-top:8px;
+  box-shadow:0 -10px 18px -14px rgba(0,0,0,.3);
+}
+.ask-wa:hover{ background:#f2fdf6; }
+
+/* 🔴 03.09.2026. Кнопка «Отправить заявку» на айфоне лежала на 1083-й точке при
+   видимой части окна 743 — то есть на 340 пикселей ниже сгиба, и до неё надо было
+   доскроллить всю форму. За четыре дня в журнале воронки НОЛЬ событий send_press
+   при 106 заходах: люди уходили, ни разу не дотянувшись до кнопки. Прибиваем её
+   к низу карточки — она видна всегда, а форма скроллится под ней. */
+.send{
+  position:sticky;
+  bottom:48px;          /* ровно над кнопкой WhatsApp, они стоят стопкой */
+  z-index:4;
+  box-shadow:0 -10px 18px -12px rgba(0,0,0,.35);
   background:var(--sage-dark);
   color:#fff;
   border:none;
@@ -604,6 +635,13 @@ footer{
       </div>
       <div class="order-total full" id="orderTotal" style="display:none"></div>
       <button class="send full" id="sendBtn">Отправить заявку</button>
+      <!-- 03.09.2026: за четыре дня 106 заходов и ноль нажатий «Отправить». При этом в
+           шапке профиля на WhatsApp кликают почти столько же, сколько на витрину, и
+           заказы в кассе есть — значит витрину смотрят как каталог, а договариваются
+           в переписке. Раньше этот переход просто терялся: из карточки уйти в WhatsApp
+           было нечем. Ссылка уносит название букета и цену, чтобы менеджеру не
+           переспрашивать. -->
+      <a class="ask-wa full" id="askWa" target="_blank" rel="noopener">Спросить про этот букет в WhatsApp</a>
     </div>
   </div>
 </div>
@@ -748,7 +786,13 @@ const ftime = document.getElementById('ftime');
 const fwishes = document.getElementById('fwishes');
 const formErr = document.getElementById('formErr');
 const sendBtn = document.getElementById('sendBtn');
+const askWa = document.getElementById('askWa');
 const FORM_ERR_DEFAULT = formErr.textContent;
+
+// Клик по «спросить в WhatsApp» — четвёртая точка воронки. Без неё уход в переписку
+// снова станет невидимым, а мы ровно из-за такой слепоты неделю искали поломку там,
+// где её не было.
+askWa.addEventListener('click', () => vtrack('wa_ask'));
 
 attachPhoneMask(fphone);
 attachPhoneMask(frphone);
@@ -1107,6 +1151,10 @@ function openModal(item, card){
   modalPhoto.style.backgroundImage = item.photo ? 'url(\'' + item.photo + '\')' : 'none';
   modalName.textContent = cleanName(item.name);
   modalPrice.textContent = fmtPrice(item.price);
+  // Название и цену кладём в текст сообщения: менеджеру не придётся выяснять,
+  // о каком букете речь, а клиенту — объяснять.
+  askWa.href = 'https://wa.me/77003696666?text=' + encodeURIComponent(
+    'Здравствуйте! Интересует букет «' + cleanName(item.name) + '» за ' + fmtPrice(item.price) + '.');
   fname.value = '';
   fphone.value = '+7 ';
   fsame.checked = true;
