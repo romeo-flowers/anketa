@@ -386,6 +386,36 @@
       padding: 6px 16px;
       border-radius: 20px;
     }
+    /* Карта в Wallet: у человека только что появились баллы, а посмотреть их негде.
+       Стиль тот же, что у кнопки отправки, чтобы читалось продолжением формы. */
+    .success-card {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      width: 100%;
+      max-width: 300px;
+      margin: 26px auto 0;
+      padding: 14px;
+      background: #8ca28c;
+      color: #ece7e1;
+      border-radius: 3px;
+      font-size: 10.5px;
+      font-weight: 500;
+      font-family: 'Circe', sans-serif;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      text-decoration: none;
+      transition: background 0.25s;
+    }
+    .success-card:hover { background: #273617; }
+    .success-card-note {
+      max-width: 300px;
+      margin: 12px auto 0;
+      font-size: 11px;
+      color: #7a7a6e;
+      line-height: 1.7;
+    }
 
     /* ─── Footer ─── */
     .footer {
@@ -520,10 +550,21 @@
       <div class="success-rose">🌹</div>
       <div class="success-title">Спасибо!</div>
       <div class="success-text">
-        Спасибо! Мы будем напоминать о важных датах за 7 дней —<br>
+        Будем напоминать о важных датах за 7 дней,<br>
         чтобы вы всегда успевали с идеальным букетом.
       </div>
       <div class="success-badge" id="success-badge">Начислено 3000 баллов ✓</div>
+
+      <!-- Баллы начислены, но смотреть их человеку негде: карта есть меньше чем
+           у половины базы. Предлагаем ровно в тот момент, когда потребность возникла.
+           Ссылка БАЗОВАЯ: золотой уровень раздаём адресно, а не всем подряд. -->
+      <a class="success-card"
+         href="https://romeokaz.posiflora.com/wallet-app/24740f15-d750-4629-be74-61cea426b22d/new-card"
+         target="_blank" rel="noopener">Поставить карту в телефон</a>
+      <div class="success-card-note">
+        Баланс всегда перед глазами, а баллами можно оплатить до половины букета.
+        Понадобится ввести номер ещё раз.
+      </div>
     </div>
   </div>
 
