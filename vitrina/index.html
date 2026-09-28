@@ -891,7 +891,9 @@ cbonusRegisterBtn.addEventListener('click', () => {
     .then(res => {
       if (res && res.ok){
         checkoutBonusRegistered = true;
-        cbonusBalanceText.textContent = 'Готово! Начислили ' + res.points + ' баллов — используете их при следующей покупке 🎉';
+        cbonusBalanceText.textContent = res.deferred
+          ? 'Готово! ' + res.points + ' баллов придут завтра — на следующую покупку 🎉'
+          : 'Готово! Начислили ' + res.points + ' баллов — используете их при следующей покупке 🎉';
         cbonusRegisterBtn.style.display = 'none';
       } else {
         cbonusRegisterBtn.disabled = false;
