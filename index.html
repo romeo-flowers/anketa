@@ -453,7 +453,7 @@
     <div class="greeting" id="greeting-line">Добро пожаловать!</div>
     <div class="header-desc">
       Заполните <span id="cfg-min-dates">2</span> и более дат — и мы начислим вам<br>
-      <strong><span id="cfg-points">3000</span> бонусных баллов</strong> на любой букет
+      <strong><span id="cfg-points">3000</span> бонусных баллов</strong> на следующий букет
     </div>
   </div>
 
@@ -1151,7 +1151,12 @@
     if (result && result.ok) {
       document.getElementById('form-section').style.display    = 'none';
       document.getElementById('success-section').style.display = 'block';
-      if (result.granted) {
+      if (result.deferred) {
+        // 28.09.2026: человеку без покупок баллы приходят на следующий день —
+        // это подарок на следующий букет, а не скидка на текущий заказ.
+        document.getElementById('success-badge').textContent =
+          CONFIG.anketaPoints + ' баллов придут завтра — на ваш следующий букет ✓';
+      } else if (result.granted) {
         var deadline = new Date();
         deadline.setDate(deadline.getDate() + CONFIG.graceDays);
         var dd = String(deadline.getDate()).padStart(2, '0');
