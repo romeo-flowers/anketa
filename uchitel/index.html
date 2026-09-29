@@ -66,7 +66,9 @@
 
   // Тот же приём учёта, что на странице-хабе: маяк уходит фоном, переход не ждёт.
   function track(event, target) {
-    var payload = JSON.stringify({ type: 'hub_event', event: event, target: target || '', src: src, ua: ua });
+    // page обязателен: без него заходы сюда сервер запишет как заходы в шапку профиля
+    // и испортит утреннюю цифру «Шапка профиля» (handleHubEvent, Код.js).
+    var payload = JSON.stringify({ type: 'hub_event', event: event, target: target || '', src: src, ua: ua, page: 'uchitel' });
     try {
       if (navigator.sendBeacon) { navigator.sendBeacon(EXEC, new Blob([payload], { type: 'text/plain;charset=UTF-8' })); return; }
     } catch (e) {}
