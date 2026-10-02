@@ -146,7 +146,7 @@
     document.getElementById('reRate').style.display = canRerate ? 'block' : 'none';
   }
   function goRate(){
-    rating = 0; sent = false;
+    rating = 0; sent = false; pendingLow = false;   // «оценить заново» с экрана вопроса = передумал
     document.querySelectorAll('.star').forEach(function(s){ s.classList.remove('on'); });
     document.getElementById('negErr').style.display = 'none';
     setHeader(defGreeting(), 'Оцените, пожалуйста — это займёт 10 секунд 🙏');
@@ -220,7 +220,7 @@
   document.getElementById('reRate').addEventListener('click', goRate);
   document.getElementById('greeting').textContent = defGreeting();
 
-  var rating = 0, sent = false;
+  var rating = 0, sent = false, pendingLow = false;
 
   // Оценку сохраняем СРАЗУ по нажатию звезды, не дожидаясь кнопок на втором экране
   // (31.07.2026). Раньше уходило только по «Отправить» / «Оставить отзыв в 2ГИС», а экран
@@ -236,7 +236,11 @@
     var t = e.target.closest('.star'); if(!t) return;
     rating = +t.getAttribute('data-v');
     document.querySelectorAll('.star').forEach(function(s){ s.classList.toggle('on', +s.getAttribute('data-v') <= rating); });
-    postRating();
+    // 02.10.2026: 1–3 НЕ отправляем сразу — сначала вопрос «верно?». Живой случай в тот же
+    // день: Жанат 1 → 2 → 5, владельцу пришло три сообщения, из них два красных.
+    // Закрыл страницу на вопросе — оценка уйдёт при закрытии (pagehide ниже), так что
+    // молча недовольный не теряется. 4 и 5 отправляем сразу, как раньше.
+    if (rating <= 3) pendingLow = true; else { pendingLow = false; postRating(); }
     setTimeout(function(){
       setHeader('Спасибо! 🌹', '');
       if(rating <= 3){ document.getElementById('confN').textContent = rating; show('conf'); }
@@ -245,9 +249,16 @@
     }, 260);
   });
 
-  document.getElementById('confYes').addEventListener('click', function(){ show('neg'); });
-  // Переоценка шлёт новую оценку той же парой (телефон, заказ) — сервер обновит строку.
-  document.getElementById('confNo').addEventListener('click', goRate);
+  document.getElementById('confYes').addEventListener('click', function(){
+    if (pendingLow) { pendingLow = false; postRating(); }
+    show('neg');
+  });
+  // «Нет, поставлю выше» — низкую оценку не отправляем вовсе.
+  document.getElementById('confNo').addEventListener('click', function(){ pendingLow = false; goRate(); });
+  // Ушёл со страницы на вопросе — низкая оценка всё равно доедет (fetch с keepalive).
+  function flushLow(){ if (pendingLow) { pendingLow = false; postRating(); } }
+  window.addEventListener('pagehide', flushLow);
+  document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'hidden') flushLow(); });
 
   document.getElementById('sendNeg').addEventListener('click', function(){
     if(sent) return;
