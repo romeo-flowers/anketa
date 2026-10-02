@@ -892,7 +892,7 @@ cbonusRegisterBtn.addEventListener('click', () => {
       if (res && res.ok){
         checkoutBonusRegistered = true;
         cbonusBalanceText.textContent = res.deferred
-          ? 'Готово! ' + res.points + ' баллов придут завтра — на следующую покупку 🎉'
+          ? 'Готово! ' + res.points + ' баллов придут после первой покупки — на следующую 🎉'
           : 'Готово! Начислили ' + res.points + ' баллов — используете их при следующей покупке 🎉';
         cbonusRegisterBtn.style.display = 'none';
       } else {

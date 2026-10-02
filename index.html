@@ -1155,7 +1155,7 @@
         // 28.09.2026: человеку без покупок баллы приходят на следующий день —
         // это подарок на следующий букет, а не скидка на текущий заказ.
         document.getElementById('success-badge').textContent =
-          CONFIG.anketaPoints + ' баллов придут завтра — на ваш следующий букет ✓';
+          CONFIG.anketaPoints + ' баллов придут после вашей первой покупки — на следующий букет ✓';
       } else if (result.granted) {
         var deadline = new Date();
         deadline.setDate(deadline.getDate() + CONFIG.graceDays);
