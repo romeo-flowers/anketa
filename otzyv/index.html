@@ -30,7 +30,11 @@
   .stars{ display:flex; justify-content:center; gap:8px; margin:4px 0; }
   .star{ font-size:46px; color:#e2ddd3; cursor:pointer; transition:transform .12s,color .12s; user-select:none; line-height:1; }
   .star:hover{ transform:scale(1.12); } .star.on{ color:#e0a91b; transform:scale(1.05); }
-  .hint{ display:flex; justify-content:space-between; font-size:10.5px; color:#b0aa9e; margin-top:12px; padding:0 2px; }
+  /* 02.10.2026: подписи были 10,5px бледно-серым — их не читали, и каждая третья «единица»
+     оказывалась ошибкой («всё понравилось», 1 звезда). Крупнее и контрастнее. */
+  .hint{ display:flex; justify-content:space-between; font-size:13px; color:#6b6b60; margin-top:12px; padding:0 2px; }
+  .ghost-btn{ display:block; width:100%; margin-top:10px; padding:13px; background:none; border:1px solid #ddd8d0;
+        border-radius:3px; font-family:'Circe',sans-serif; font-size:14px; color:#4f564f; cursor:pointer; }
   .b-emoji{ font-size:46px; margin-bottom:4px; }
   .b-title{ font-family:'Playfair Display',serif; font-size:21px; font-weight:400; color:#273617; margin:4px 0 8px; }
   .b-text{ font-size:13px; color:#7a7a6e; line-height:1.75; }
@@ -74,7 +78,17 @@
           <span class="star" data-v="3">★</span><span class="star" data-v="4">★</span>
           <span class="star" data-v="5">★</span>
         </div>
-        <div class="hint"><span>не понравилось</span><span>всё отлично</span></div>
+        <div class="hint"><span>1 — плохо</span><span>5 — отлично</span></div>
+      </div>
+
+      <!-- 02.10.2026: подтверждение для 1–3. Звезда засчитывается с первого касания, и люди,
+           ткнувшие первую звезду не глядя, писали «всё понравилось» под единицей. -->
+      <div id="conf" class="screen">
+        <div class="b-emoji">🤔</div>
+        <div class="b-title">Вы поставили <span id="confN"></span> из 5</div>
+        <p class="b-text">Значит, что-то не понравилось. Всё верно?</p>
+        <button class="submit-btn" id="confYes">Да, есть замечания</button>
+        <button class="ghost-btn" id="confNo">Нет, всё понравилось — поставлю выше</button>
       </div>
 
       <div id="neg" class="screen">
@@ -225,11 +239,15 @@
     postRating();
     setTimeout(function(){
       setHeader('Спасибо! 🌹', '');
-      if(rating <= 3){ show('neg'); }
+      if(rating <= 3){ document.getElementById('confN').textContent = rating; show('conf'); }
       else if(rating === 4){ show('ok4'); }
       else { document.getElementById('gisBtn').href = GIS_URL; show('ok5'); }
     }, 260);
   });
+
+  document.getElementById('confYes').addEventListener('click', function(){ show('neg'); });
+  // Переоценка шлёт новую оценку той же парой (телефон, заказ) — сервер обновит строку.
+  document.getElementById('confNo').addEventListener('click', goRate);
 
   document.getElementById('sendNeg').addEventListener('click', function(){
     if(sent) return;
