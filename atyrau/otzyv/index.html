@@ -132,7 +132,7 @@
 
 <script>
   var SUBMIT_URL = 'https://script.google.com/macros/s/AKfycbwz5Ukf7UnpHP_1D8pFngPbCK43x6enVSCgN6Xb5UjNYsFAJYxFVio7DF0wgjj9he9O/exec';  // Ромео Атырау (Бастык)
-  var GIS_URL = 'https://2gis.kz/firm/70000001102987292/tab/reviews/addreview';  // id ФИЛИАЛА, не кабинета (…291 даёт 404)
+  var GIS_URL = 'https://2gis.kz/atyrau/geo/70000001102987292';  // вид как у Ромео: /addreview приложение 2ГИС открывает пустым «Оцените место» (07.10); id ФИЛИАЛА, не кабинета
 
   function getParam(k){ try{ return new URLSearchParams(location.search).get(k)||''; }catch(e){ return ''; } }
   function getPhone(){ return getParam('phone'); }
