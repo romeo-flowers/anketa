@@ -137,6 +137,7 @@
   function getParam(k){ try{ return new URLSearchParams(location.search).get(k)||''; }catch(e){ return ''; } }
   function getPhone(){ return getParam('phone'); }
   var CNAME = getParam('name').trim();
+  var TOKEN = getParam('t');   // одноразовый код ссылки (20.10.2026): по нему сервер знает телефон и не даёт менять оценку задним числом
   var CORDER = (getParam('order') || getParam('date') || '').trim();
   function defGreeting(){ return CNAME ? CNAME + ', как вам заказ?' : 'Как вам ваш заказ?'; }
   function show(id){
@@ -237,7 +238,7 @@
   // недовольство не доезжало вовсе. Кнопки ниже шлют ту же пару (телефон, заказ) повторно —
   // сервер обновляет ту же строку, а не плодит вторую.
   function postRating(){
-    post({ type:'nps', rating:rating, phone:getPhone(), comment:'', name:CNAME, order:CORDER });
+    post({ type:'nps', rating:rating, phone:getPhone(), comment:'', name:CNAME, order:CORDER, token:TOKEN });
   }
 
   document.getElementById('stars').addEventListener('click', function(e){
@@ -276,15 +277,15 @@
     if(!hasPhone && !cm){ document.getElementById('negErr').style.display='block'; return; }
     document.getElementById('negErr').style.display='none';
     sent = true;
-    post({ type:'nps', rating:rating, phone:(hasPhone?raw:getPhone()), comment:cm, name:CNAME, order:CORDER });
+    post({ type:'nps', rating:rating, phone:(hasPhone?raw:getPhone()), comment:cm, name:CNAME, order:CORDER, token:TOKEN });
     setHeader('Приняли 💌', ''); show('doneNeg');
   });
   document.getElementById('send4').addEventListener('click', function(){
     if(sent) return; sent = true;
-    post({ type:'nps', rating:4, phone:getPhone(), comment:document.getElementById('c4').value.trim(), name:CNAME, order:CORDER });
+    post({ type:'nps', rating:4, phone:getPhone(), comment:document.getElementById('c4').value.trim(), name:CNAME, order:CORDER, token:TOKEN });
     show('donePos');
   });
-  function post5(){ if(sent) return; sent = true; post({ type:'nps', rating:5, phone:getPhone(), comment:document.getElementById('c5').value.trim(), name:CNAME, order:CORDER }); }
+  function post5(){ if(sent) return; sent = true; post({ type:'nps', rating:5, phone:getPhone(), comment:document.getElementById('c5').value.trim(), name:CNAME, order:CORDER, token:TOKEN }); }
   document.getElementById('gisBtn').addEventListener('click', post5);
   document.getElementById('send5').addEventListener('click', function(){ post5(); show('donePos'); });
 </script>
