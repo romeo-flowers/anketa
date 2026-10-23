@@ -602,7 +602,7 @@ footer{
       <div class="field-hint full">На этот номер выставим счёт Kaspi</div>
       <div class="bonus-box full" id="cbonusBox" style="display:none">
         <div class="bonus-balance" id="cbonusBalanceText"></div>
-        <button type="button" class="bonus-register-btn" id="cbonusRegisterBtn" style="display:none">Зарегистрироваться и получить 1000 баллов</button>
+        <button type="button" class="bonus-register-btn" id="cbonusRegisterBtn" style="display:none">Зарегистрироваться: 1000 баллов придут после первой покупки</button>
         <label class="checkline" id="cbonusUseLine" style="display:none;margin-top:8px;">
           <input type="checkbox" id="cbonusUse"> Хочу списать баллы с этого заказа (сумму согласуем с менеджером)
         </label>
@@ -813,7 +813,7 @@ function resetCheckoutBonus(){
   cbonusBalanceText.textContent = '';
   cbonusRegisterBtn.style.display = 'none';
   cbonusRegisterBtn.disabled = false;
-  cbonusRegisterBtn.textContent = 'Зарегистрироваться и получить 1000 баллов';
+  cbonusRegisterBtn.textContent = 'Зарегистрироваться: 1000 баллов придут после первой покупки';
   cbonusUseLine.style.display = 'none';
   cbonusUse.checked = false;
   checkoutBonusRegistered = false;
