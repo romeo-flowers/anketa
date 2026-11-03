@@ -648,6 +648,10 @@ footer{
 
 <script>
 const SUBMIT_URL = 'https://script.google.com/macros/s/AKfycbx0FYyE3hckyyyhzZPbf4X2gELlhLoGNj8YbRfJcjj1bTbKlKjo-n16cMUWN7SBnxDepw/exec';
+// Каталог — из новой CRM, а не из Posiflora (03.11.2026, Настя: «люди хотят заказать букеты, а их уже нет»).
+// Флористы выставляют букеты в CRM; Posiflora осталась со старыми. Заявки по-прежнему идут в SUBMIT_URL.
+// У CRM нет «холодного старта» Apps Script: пустой список — это правда (витрина пуста), а не сбой.
+const CATALOG_URL = 'https://app.romeo-flowers.kz/api/v1/public/vitrina';
 const KASPI_LINK = 'https://pay.kaspi.kz/pay/qlv5kzz7';
 
 // 🔴 Разметка витрины, 23.08.2026.
@@ -1567,16 +1571,12 @@ function loadVitrinaFast(){
 // на экране остаётся уже нарисованная статика, а это ровно то, что было бы и без проверки.
 function revalidateVitrina(attempt){
   attempt = attempt || 1;
-  fetch(SUBMIT_URL, {
-    method:'POST',
-    headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ type:'vitrina_list' })
-  })
-    .then(r => r.json())
+  fetch(CATALOG_URL, { cache:'no-store' })
+    .then(r => r.ok ? r.json() : Promise.reject(new Error('код ' + r.status)))
     .then(items => {
-      // Пустой ответ — это холодный старт Apps Script, а не пустая витрина: затирать им
-      // рабочий каталог нельзя, поэтому уходим в общий catch и пробуем ещё раз.
-      if (!Array.isArray(items) || !items.length) throw new Error('пустой каталог');
+      if (!Array.isArray(items)) throw new Error('не каталог');
+      // Пустой список от CRM — витрина и правда пуста: проданное показывать нельзя.
+      if (!items.length) { if (!modalOverlay.classList.contains('open')) showVitrinaEmpty(); return; }
       if (catalogKey(items) === shownCatalogKey) return;   // статика была верной
       if (modalOverlay.classList.contains('open')){
         pendingCatalog = items;   // клиент заполняет форму — не выдёргиваем карточки из-под него
@@ -1606,19 +1606,11 @@ function applyPendingCatalog(){
 
 function loadVitrina(attempt){
   attempt = attempt || 1;
-  fetch(SUBMIT_URL, {
-    method:'POST',
-    headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify({ type:'vitrina_list' })
-  })
-    .then(r => r.json())
+  fetch(CATALOG_URL, { cache:'no-store' })
+    .then(r => r.ok ? r.json() : Promise.reject(new Error('код ' + r.status)))
     .then(items => {
-      if (!items || !items.length){
-        // холодный старт GAS иногда отдаёт пусто — повторяем, лоадер держим
-        if (attempt < VITRINA_MAX_TRIES){ setTimeout(() => loadVitrina(attempt + 1), 1200); return; }
-        showVitrinaEmpty();
-        return;
-      }
+      if (!Array.isArray(items)) throw new Error('не каталог');
+      if (!items.length) { showVitrinaEmpty(); return; }   // CRM ответила: витрина пуста
       renderVitrina(items);
     })
     .catch(() => {

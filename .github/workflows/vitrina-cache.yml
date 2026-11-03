@@ -88,28 +88,27 @@ jobs:
           python3 - <<'PY'
           import json, os, sys, time, urllib.request
 
-          URL = ("https://script.google.com/macros/s/"
-                 "AKfycbx0FYyE3hckyyyhzZPbf4X2gELlhLoGNj8YbRfJcjj1bTbKlKjo-n16cMUWN7SBnxDepw/exec")
+          # 03.11.2026: каталог — из новой CRM (флористы выставляют букеты там), а не из Posiflora через
+          # Apps Script: Posiflora осталась со старыми букетами, клиенты просили то, чего нет (Настя).
+          URL = "https://app.romeo-flowers.kz/api/v1/public/vitrina"
 
-          # Три попытки: холодный старт Apps Script / временный сбой Posiflora иногда отдают
-          # пусто или HTML вместо каталога (та же причина, по которой в самой витрине стоит ретрай).
+          # Три попытки на сетевой сбой. Пустой список от CRM — правда (витрина пуста), его записываем:
+          # у CRM нет «холодного старта», ради которого пустой ответ раньше считался сбоем.
           items = None
           for attempt in range(1, 4):
               try:
-                  req = urllib.request.Request(
-                      URL, data=json.dumps({"type": "vitrina_list"}).encode(),
-                      headers={"Content-Type": "text/plain"}, method="POST")
-                  with urllib.request.urlopen(req, timeout=120) as r:
+                  req = urllib.request.Request(URL, headers={"User-Agent": "vitrina-cache"})
+                  with urllib.request.urlopen(req, timeout=60) as r:
                       got = json.loads(r.read().decode())
-                  if isinstance(got, list) and got:
+                  if isinstance(got, list):
                       items = got
                       break
-                  print(f"попытка {attempt}: пустой ответ")
+                  print(f"попытка {attempt}: ответ не список")
               except Exception as e:
                   print(f"попытка {attempt}: {e}")
               time.sleep(5)
 
-          if items:
+          if items is not None:
               with open("vitrina/data.json", "w", encoding="utf-8") as f:
                   json.dump(items, f, ensure_ascii=False, separators=(",", ":"))
               # Отметка живого забора. Пишется ВСЕГДА при успехе, даже если каталог не изменился
