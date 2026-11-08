@@ -366,6 +366,7 @@ footer{
   height:16px;
 }
 .modal-form .err{color:#a15a2c;font-size:12.5px;display:none;}
+.modal-form .bad{border-color:#b3261e !important;box-shadow:0 0 0 2px rgba(179,38,30,.15);}
 .modal-form .field-hint{
   font-size:11.5px;
   color:var(--muted);
@@ -789,6 +790,11 @@ const addressSuggest = document.getElementById('addressSuggest');
 const ftime = document.getElementById('ftime');
 const fwishes = document.getElementById('fwishes');
 const formErr = document.getElementById('formErr');
+// Красная рамка уходит, как только поле начали заполнять.
+[fname, fphone, frname, frphone, faddress, ftime].forEach(f => {
+  f.addEventListener('input', () => f.classList.remove('bad'));
+  f.addEventListener('change', () => f.classList.remove('bad'));
+});
 const sendBtn = document.getElementById('sendBtn');
 const askWa = document.getElementById('askWa');
 const FORM_ERR_DEFAULT = formErr.textContent;
@@ -1177,6 +1183,7 @@ function openModal(item, card){
   fwishes.value = '';
   formErr.style.display = 'none';
   formErr.textContent = FORM_ERR_DEFAULT;   // могло остаться «букет забрали» от прошлого открытия
+  [fname, fphone, frname, frphone, faddress, ftime].forEach(f => f.classList.remove('bad'));
   sendBtn.disabled = false;
   sendBtn.style.opacity = '';
   resetCheckoutBonus();
@@ -1314,13 +1321,23 @@ document.getElementById('sendBtn').addEventListener('click', () => {
   const time = ftime.value.trim();
   const wishes = fwishes.value.trim();
 
-  const valid = name && phone.replace(/\D/g,'').length >= 10 &&
-    (sameRecipient || (rname && rphone.replace(/\D/g,'').length >= 10)) &&
-    (!isDelivery || address) &&
-    time;
+  // 08.11.2026: «Заполните обязательные поля» без указания какое — люди жали «Отправить» по 3–4 раза и уходили
+  // в WhatsApp (06.11, 26.10). Теперь пустое поле подсвечено, страница едет к нему, и в журнале видно, на чём застряли.
+  const пусто = [];
+  if (!name) пусто.push([fname, 'имя', 'name']);
+  if (phone.replace(/\D/g,'').length < 10) пусто.push([fphone, 'телефон (10 цифр)', 'phone']);
+  if (!sameRecipient && !rname) пусто.push([frname, 'имя получателя', 'rname']);
+  if (!sameRecipient && rphone.replace(/\D/g,'').length < 10) пусто.push([frphone, 'телефон получателя', 'rphone']);
+  if (isDelivery && !address) пусто.push([faddress, 'адрес доставки', 'address']);
+  if (!time) пусто.push([ftime, 'к какому времени нужен букет', 'time']);
+  [fname, fphone, frname, frphone, faddress, ftime].forEach(f => f.classList.remove('bad'));
 
-  if (!valid){
+  if (пусто.length){
+    пусто.forEach(p => p[0].classList.add('bad'));
+    formErr.textContent = 'Заполните: ' + пусто.map(p => p[1]).join(', ');
     formErr.style.display = 'block';
+    try { пусто[0][0].scrollIntoView({ behavior: 'smooth', block: 'center' }); пусто[0][0].focus({ preventScroll: true }); } catch (e) {}
+    vtrack('form_missing_' + пусто.map(p => p[2]).join('_'));
     return;
   }
   formErr.style.display = 'none';
