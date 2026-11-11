@@ -537,6 +537,15 @@ footer{
 .bonus-register-btn:hover{background:var(--sage-dark);color:#fff;}
 .bonus-register-btn:disabled{opacity:.6;cursor:default;}
 
+/* 11.11.2026: на телефоне букеты по два в ряд. Раньше один букет занимал экран, 38 штук = 23 тыс. пикселей прокрутки,
+   карточку открывали 15% зашедших (13 из 88 за 4 дня), а кнопка «Хочу этот букет» у первого стояла ниже сгиба. */
+@media (max-width:520px){
+  #grid.grid{grid-template-columns:1fr 1fr;gap:10px;}
+  #grid .card .body{padding:10px 10px 12px;gap:6px;}
+  #grid .card .name{font-size:14px;line-height:1.25;}
+  #grid .card .price{font-size:14px;}
+  #grid .card button.want{font-size:11px;letter-spacing:.04em;padding:9px 6px;}
+}
 @media (max-width:480px){
   .modal-form{grid-template-columns:1fr;}
   .modal-form .recipient-fields{grid-template-columns:1fr;}
